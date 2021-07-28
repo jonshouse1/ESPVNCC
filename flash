@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# was 115200,  230400,  460800
+#esptool --chip esp32 --port /dev/ttyUSB0 --baud 230400 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect 0x1000 ./build/bootloader/bootloader.bin 0x10000 ./build/ethernet_basic.bin 0x8000 ./build/partition_table/partition-table.bin
+esptool --chip esp32 --port /dev/ttyUSB0 --baud 460800  --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect 0x1000 ./build/bootloader/bootloader.bin 0x10000 ./build/ethernet_basic.bin 0x8000 ./build/partition_table/partition-table.bin
+
+gtkterm
+
