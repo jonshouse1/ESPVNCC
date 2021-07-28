@@ -188,6 +188,7 @@ void lcd_init()
 	gpio_intr_disable(36);					// common issue
 	//gpio_intr_disable(39);
 
+	led_pwm_set(255);					// Just set max for now
 	ESP_LOGI(TAG, "[APP] IDF version: %s", esp_get_idf_version());
 	ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
 }

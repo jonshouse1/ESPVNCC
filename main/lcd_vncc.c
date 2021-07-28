@@ -36,37 +36,29 @@
 #include "jag.h"
 #include "endian.h"
 
-
 //extern scr_driver_t		lcd_drv;
-//extern touch_panel_driver_t	touch_drv;
+extern touch_panel_driver_t	touch_drv;
 
-// extern globals
+int			did_draw=FALSE;
+char 			vncc_host_ip[22];
+int			vncc_screennum=1;
+int			vncc_port=0;
 extern const char *TAG;
 extern int 		online;
 extern int  		link_up;
 extern int 		connection_state;
-//extern int 		doredraw;
-
-// LCD gui state
 extern int 		backlight;
-extern int 		gui_screen;	
-extern int		pgui_screen;
-
-
-int			vncc_state = VNCC_NOT_CONNECTED;
+static int		vncc_state = VNCC_NOT_CONNECTED;
 static int		vncc_taskcreated = FALSE;
-char 			vncc_host_ip[22];
-int			vncc_screennum=1;
-int			vncc_port=0;
 static int		vncc_sock=-1;
 static char		vncc_rxbuf[4096];
 static char		vncc_txbuf[64];
 static int		vncc_busy = FALSE;
-static int		vncc_update_rate_hz = 20;
+static int		vncc_update_rate_hz = 25;
 
-
-struct vnc_ServerInit	vncc_si;							// Keep a copy for reference
+struct vnc_ServerInit	vncc_si;									// Keep a copy for reference
 char   			si_name[32];
+
 
 
 // Close the TCP connection 
@@ -76,10 +68,11 @@ void vncc_shutdown()
 	{
 		shutdown(vncc_sock, 0);
 		close(vncc_sock);
-	}
-	vncc_sock=-1;
+	}												// back to text mode
+	lcd_textbuf_enable(TRUE, did_draw);								// did_draw==TRUE=clear screen
+	did_draw=FALSE;	
 	vncc_state = VNCC_NOT_CONNECTED;
-	gui_screen = JLC_GUI_SCREEN_TEXTBUF;
+	vncc_sock=-1;
 }
 
 
@@ -91,14 +84,19 @@ int readbytes(int fd, char*buf , int n)
 	int cs=16;											// chunk size
 	int len=0;
 
+	if (fd<0)
+		return(-1);
 	bytestoread=n;
 	if (n<cs)											// small read
 		cs=n;											// read it all in one go
 	do
 	{
-		len = recv(fd, buf+bytesread, cs, 0);	// One lines worth of pixel data
+		len = recv(fd, buf+bytesread, cs, 0);
 		if (len<0)										// socket read error ?
+		{
 			vncc_shutdown();
+			return(-1);
+		}
 		if (len>0)
 		{
 			if (len<cs)									// read less than expected
@@ -188,8 +186,7 @@ void process_server_init(struct vnc_ServerInit* si)
 	memcpy((struct vnc_ServerInit*)&vncc_si, si, sizeof(struct vnc_ServerInit));		// Use the copy from now on
 
 	bzero(&vncc_rxbuf,sizeof(vncc_rxbuf));
-	//len = recv(vncc_sock, (char*)&vncc_rxbuf, vncc_si.namelen, 0);				// Read remainder of server_init
-	len = readbytes(vncc_sock, (char*)&vncc_rxbuf, vncc_si.namelen);				// Read remainder of server_init
+	len = readbytes(vncc_sock, (char*)&vncc_rxbuf, vncc_si.namelen);			// Read remainder of server_init
 	if (len==vncc_si.namelen)
 	{
 		printf("read name, got %d bytes\n",len);
@@ -224,15 +221,6 @@ static void vncc_send_framebuffer_update_request(int x, int y, int w, int h, uin
 }
 
 
-/*
-struct __attribute__ ((__packed__)) vnc_PointerEvent
-{
-        uint8_t                 msg_type;
-        uint8_t                 button_mask;            // Mask for 8 button, 1=down
-        uint16_t                xpos;
-        uint16_t                ypos;
-};
-*/
 void vncc_send_pointer_event(uint16_t x, uint16_t y, uint8_t msk)
 {
 	struct	vnc_PointerEvent	pev;
@@ -253,7 +241,7 @@ void vncc_send_pointer_event(uint16_t x, uint16_t y, uint8_t msk)
 
 
 // Try and stay in sync with protocol by throwing away data when we seem out of sync
-// This can be removed then everything else is working as expected
+// This can be removed when everything else is working as expected
 static void vncc_drain(char *s)
 {
 	int len=0;
@@ -317,6 +305,7 @@ void vncc_process_rectangle(int r)
 				{
 					readbytes(vncc_sock, (char*)&pixels, rec.width*2);		// read one lines worth of pixel data
 					jag_draw_icon(rec.xpos, rec.ypos+l, rec.width, 1, (char*)&pixels);
+					did_draw=TRUE;							// We did draw something on the LCD
 					//jag_draw_bitmap(rec.xpos, rec.ypos+l, rec.width, 1, (char*)&pixels);
 				}
 			break;
@@ -388,7 +377,6 @@ static void vncc_process_colormapentry()
 	struct vnc_rgbentry		rgbe;
 	int i=0;
 
-	//len = recv(vncc_sock, (char*)&cme, sizeof(struct vnc_colormapentry), 0);			// Get header
 	len = readbytes(vncc_sock, (char*)&cme, sizeof(struct vnc_colormapentry));			// Get header
 	if (len==sizeof(struct vnc_colormapentry))
 	{
@@ -414,30 +402,34 @@ static void vncc_client_task(void *pvParameters)
 
 	while (1)
 	{
-		if (vncc_sock<=0)
-		{
-			do
-			{
-				vncc_doconnect();
-				if (vncc_sock<=0)
-				{
-					lcd_textbuf_printstring("Failed to connect\n");
-					vTaskDelay(3000 / portTICK_PERIOD_MS);
-				}
-				else	
-				{
-					lcd_textbuf_printstring("Got connection\n");
-					ESP_LOGI(TAG,"Got connection");
-					bzero(&vncc_rxbuf,sizeof(vncc_rxbuf));
-					vncc_state = VNCC_EXPECTING_GREETING;
-				}
-			} while (vncc_sock<=0);
-		}
-
 		if (vncc_state!=VNCC_MAINLOOP)
 			printf("vncc_state=%d\n",vncc_state);
 		switch (vncc_state)
 		{
+			case VNCC_NOT_CONNECTED:
+				if (vncc_sock<=0)
+				{
+					do
+					{
+						vncc_doconnect();
+						if (vncc_sock<=0)
+						{
+							lcd_textbuf_printstring("Failed to connect\n");
+							vTaskDelay(3000 / portTICK_PERIOD_MS);
+						}
+						else	
+						{
+							lcd_textbuf_printstring("Got connection\n");
+							ESP_LOGI(TAG,"Got connection");
+							bzero(&vncc_rxbuf,sizeof(vncc_rxbuf));
+							vncc_state = VNCC_EXPECTING_GREETING;
+						}
+					} while (vncc_sock<=0);
+				}
+			break;
+
+
+
 			case VNCC_EXPECTING_GREETING:
 				len = recv(vncc_sock, vncc_rxbuf, sizeof(vncc_rxbuf) - 1, 0);
 				if (len!=12)
@@ -499,9 +491,9 @@ static void vncc_client_task(void *pvParameters)
 				else	vncc_shutdown();
 				// TODO: SetPixelFormat
 				// TODO: SetEncodings
+				lcd_textbuf_enable(FALSE, FALSE);				// Make sure task stops driving SPI LCD
 				vncc_send_framebuffer_update_request(0, 0, 240, 320, 0);	// Send entire screen now
 				vncc_state = VNCC_MAINLOOP;
-				gui_screen = JLC_GUI_SCREEN_VNC;
 			break;
 
 
@@ -540,15 +532,41 @@ static void vncc_client_task(void *pvParameters)
 
 
 
-// As reads are blocing best to do the requests on a timer of its own
-static void vncc_periodic_request_task(void *pvParameters)
+// socket reads are blocking, so best to do the requests on a task of its own
+static void vncc_periodic_request_and_touch_task(void *pvParameters)
 {
+	touch_panel_points_t    points;
+	uint32_t 		x=0;
+	uint32_t		y=0;
+	uint32_t		e=0;
+	static int		px=0;
+	static int		py=0;
+	static int		pe=0;
+
 	while (1)
 	{
-		if (vncc_state==VNCC_MAINLOOP && vncc_busy!=TRUE)				// Connected and otherwise idle
-			vncc_send_framebuffer_update_request(0, 0, 240, 320, 1);		// Ask for data
+		if (vncc_state==VNCC_MAINLOOP)
+		{
+			if (vncc_busy!=TRUE)							// Connected and otherwise idle
+				vncc_send_framebuffer_update_request(0, 0, 240, 320, 1);	// Ask for data
+
+			touch_drv.read_point_data(&points);
+			x=points.curx[0];
+			y=points.cury[0];
+			e=points.event;
+			if (x!=px || y!=py || e!=pe)						// cursor changed ?
+			{
+				if (e == TOUCH_EVT_PRESS)
+				{
+					vncc_send_pointer_event((uint16_t)x, (uint16_t)y, 1);	// mouse push down
+					vncc_send_pointer_event((uint16_t)x, (uint16_t)y, 0);	// mouse release
+				}
+				px=x;
+				py=y;
+				pe=e;
+			}
+		}
 		vTaskDelay((1000/vncc_update_rate_hz) / portTICK_PERIOD_MS);			// limit request rate to N Hz
-		//vTaskDelay(25 / portTICK_PERIOD_MS);
 	}
 }
 
@@ -566,7 +584,8 @@ void vncc_connect(char *host_ip, int screennum)
 	if (vncc_taskcreated!=TRUE)
 	{
 		xTaskCreate(vncc_client_task, "vnc_task", 20*1024, NULL, configMAX_PRIORITIES -1 , NULL);
-		xTaskCreate(vncc_periodic_request_task, "req_task", 5*1024, NULL, 5, NULL);
+		xTaskCreate(vncc_periodic_request_and_touch_task, "req_task", 8*1024, NULL, 5, NULL);
 	}
 }
+
 

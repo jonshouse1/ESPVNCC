@@ -1,22 +1,16 @@
 /* 
 	jag.c
 
-	Version  0.5
-	Last modified:
-	22 Jul 2021
-
-	J A Graphics lib for ESP32 IDF (Rtos)
+	J A Graphics lib for ESP32 IDF (RTOS)
 	Assumes 16 bit display only
-
-	An attempt to make a thread safe graphics library
 
 	Every LCD write should go through this code.
 
 	painter_fonts are part of the esp-iot-solution touch screen calibration code.
 	The calibration code is linked in with the lcd driver support.
 
-	This code drives the esp-iot-solution LCD driver functions found here:
-	esp/esp-iot-solution/components/display/screen/controller_driver/
+		See:
+			esp-iot-solution/components/display/screen/controller_driver/
 */
 
 

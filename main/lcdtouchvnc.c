@@ -34,12 +34,6 @@ scr_driver_t				lcd_drv;
 touch_panel_driver_t 			touch_drv;
 
 
-// prototypes
-void lcd_task(void *pvParameters);
-//void tcp_server_task(void *pvParameters);
-
-
-
 // globals
 const char *TAG = "lcdtouchvnc";
 char	client_ip[16];
@@ -48,22 +42,10 @@ int	online		= FALSE;					// TRUE = connected with an IP address?
 int	link_up		= FALSE;					// TRUE = network cable plugged in
 int	connection_state= 0;						// non zero when client_ip, server_ip or online change state
 
-
-
 // LCD gui state
 int  backlight			= 255;					// LED backlight intensity, 8 bit
-int  gui_screen			= JLC_GUI_SCREEN_TEXTBUF;
-int  pgui_screen		= JLC_GUI_SCREEN_TEXTBUF;		// make sure lcd_gui does not redraw yet
 
 
-
-
-// Reset back to the initial "non connected" state
-void defaults()
-{
-	gui_screen  = JLC_GUI_SCREEN_TEXTBUF;
-	pgui_screen = JLC_GUI_SCREEN_TEXTBUF;
-}
 
 
 // Covert 24 bit RGB to 16 bit 565,  pass 24 bit in as pointer to 3 bytes
@@ -119,7 +101,6 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base, int32_t ev
 		break;
 
 		case ETHERNET_EVENT_DISCONNECTED:
-			gui_screen = JLC_GUI_SCREEN_TEXTBUF;					// switch back to terminal screen
 			link_up=FALSE;
 			ESP_LOGI(TAG, "Ethernet Link Down");
 			lcd_textbuf_printstring("Ethernet Link Down\n");
@@ -177,7 +158,6 @@ static void lost_ip_event_handler()
 	bzero(&client_ip,sizeof(client_ip));
 	ESP_LOGI(TAG, "Lost ethernet IP address");
 	lcd_textbuf_printstring("Lost IP address\n");
-	gui_screen = JLC_GUI_SCREEN_TEXTBUF;							// switch back to terminal screen
 	online=FALSE;
 	connection_state=1;									// something has changed, prompt GUI code
 }
@@ -188,9 +168,6 @@ static void lost_ip_event_handler()
 #define	PIN_PHY_POWER	12					
 void app_main(void)
 {
-	int i=0;
-
-	defaults();
 	bzero(&lcd_drv, sizeof(scr_driver_t));
 	lcd_init((scr_driver_t*)&lcd_drv, (touch_panel_driver_t*)&touch_drv);			// initialise the SPI LCD driver
 	jag_init((scr_driver_t*)&lcd_drv, 240, 320);						// initialise my graphics library
@@ -270,7 +247,7 @@ void app_main(void)
 	/* start Ethernet driver state machine */
 	ESP_ERROR_CHECK(esp_eth_start(eth_handle));
 
-	xTaskCreate(lcd_task, "lcdtask", 80*1024, NULL, configMAX_PRIORITIES-1, NULL);		// highest priority
+	//xTaskCreate(lcd_task, "lcdtask", 80*1024, NULL, configMAX_PRIORITIES-1, NULL);		// highest priority
 	xTaskCreate(yafdp_server_task, "yafdp_server", 16384, NULL, 0, NULL);			// 0 = lowest priority
 }
 
