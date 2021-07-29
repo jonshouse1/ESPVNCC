@@ -66,6 +66,7 @@ void vncc_shutdown()
 {
 	if (vncc_sock>0)
 	{
+		vncc_sock=-1;
 		shutdown(vncc_sock, 0);
 		close(vncc_sock);
 		lcd_textbuf_enable(TRUE, did_draw);							// did_draw==TRUE=clear screen
@@ -144,6 +145,7 @@ void vncc_doconnect()
 		lcd_textbuf_printstring(st);
 		lcd_textbuf_printstring("\n");
 		ESP_LOGE(TAG, "%s", st);
+		vncc_sock=-1;
 		vncc_shutdown();
 		return;
         }
