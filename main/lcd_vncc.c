@@ -132,17 +132,17 @@ void vncc_doconnect()
         if (vncc_sock < 0) 
 	{
 		vncc_sock=-1;
-		ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
+		ESP_LOGE(TAG, "Failed to create socket: err %d", errno);
 		return;
 	}
-	sprintf(st,"Connecting to %s:%d", vncc_host_ip, vncc_port);  
+	sprintf(st,"Trying %s:%d", vncc_host_ip, vncc_port);  
         ESP_LOGI(TAG, "%s",st);
 	lcd_textbuf_printstring(st);
 	lcd_textbuf_printstring("\n");
 	int err = connect(vncc_sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
         if (err != 0) 
 	{
-		sprintf(st,"unable to connect, err %d", errno);
+		sprintf(st,"Can't connect, err %d", errno);
 		lcd_textbuf_printstring(st);
 		lcd_textbuf_printstring("\n");
 		ESP_LOGE(TAG, "%s", st);
