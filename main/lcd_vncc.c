@@ -68,9 +68,9 @@ void vncc_shutdown()
 	{
 		shutdown(vncc_sock, 0);
 		close(vncc_sock);
+		lcd_textbuf_enable(TRUE, did_draw);							// did_draw==TRUE=clear screen
+		did_draw=FALSE;	
 	}												// back to text mode
-	lcd_textbuf_enable(TRUE, did_draw);								// did_draw==TRUE=clear screen
-	did_draw=FALSE;	
 	vncc_state = VNCC_NOT_CONNECTED;
 	vncc_sock=-1;
 }
