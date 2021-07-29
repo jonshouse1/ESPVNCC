@@ -102,9 +102,6 @@ void led_pwm_set(int b)
 }
 
 
-// See https://github.com/espressif/esp-iot-solution/blob/master/examples/hmi/lvgl_thermostat/main/app_main.c
-// https://docs.espressif.com/projects/espressif-esp-iot-solution/en/latest/basic/bus.html
-
 
 // Inil lcd display and touch screen
 void lcd_init()
@@ -178,17 +175,8 @@ void lcd_init()
 
 	touch_drv.init(&touch_cfg);
 	touch_drv.calibration_run(&lcd_drv, false);		// true=force, false read from flash if possible
-
-	//gpio_pullup_en(GPIO_DATACMD);
-	//gpio_pullup_en(GPIO_SCLK);
-	//gpio_pullup_en(GPIO_TCS);
-	//gpio_pullup_en(GPIO_LCDCS);
-
-	//gpio_intr_disable(35);
 	gpio_intr_disable(36);					// common issue
-	//gpio_intr_disable(39);
 
-	led_pwm_set(255);					// Just set max for now
 	ESP_LOGI(TAG, "[APP] IDF version: %s", esp_get_idf_version());
 	ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
 }
