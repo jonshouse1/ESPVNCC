@@ -3,6 +3,9 @@
 	VNC connection to a host
 */
 
+#define VNC_SERVER_IPADDR 	"192.168.1.111"
+#define VNC_SERVER_SCREEN_NUM	1
+
 #include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -41,43 +44,6 @@ char	server_ip[16];
 int	online		= FALSE;					// TRUE = connected with an IP address?
 int	link_up		= FALSE;					// TRUE = network cable plugged in
 int	connection_state= 0;						// non zero when client_ip, server_ip or online change state
-
-// LCD gui state
-int  backlight			= 255;					// LED backlight intensity, 8 bit
-
-
-
-
-// Covert 24 bit RGB to 16 bit 565,  pass 24 bit in as pointer to 3 bytes
-uint16_t rgb888torgb565(uint8_t *rgb888Pixel)
-{
-    uint8_t red   = rgb888Pixel[2];
-    uint8_t green = rgb888Pixel[1];
-    uint8_t blue  = rgb888Pixel[0];					// R and B swapped on this display
-    uint16_t r = ((red >> 3) & 0x1f) << 11;
-    uint16_t g = ((green >> 2) & 0x3f) << 5;
-    uint16_t b = (blue >> 3) & 0x1f;
-    return (uint16_t) (r | g | b);
-}
-
-
-
-// Convert hex string to unsigned int
-uint32_t hextoint(char *hex) 
-{
-	uint32_t val = 0;
-	uint8_t  byte = 0;
-	while (*hex) 
-	{								// get current character then increment
-		byte = *hex++; 
-        	if (byte >= '0' && byte <= '9') byte = byte - '0';
-        	else if (byte >= 'a' && byte <='f') byte = byte - 'a' + 10;
-        	else if (byte >= 'A' && byte <='F') byte = byte - 'A' + 10;    
-        	val = (val << 4) | (byte & 0xF);
-	}
-	return val;
-}
-
 
 
 
@@ -149,7 +115,7 @@ static void got_ip_event_handler(void *arg, esp_event_base_t event_base,int32_t 
 	lcd_textbuf_printstring(st);
 	online=TRUE;
 	connection_state=1;
-	vncc_connect("192.168.1.111",1);
+	vncc_connect(VNC_SERVER_IPADDR, VNC_SERVER_SCREEN_NUM);
 }
 
 
