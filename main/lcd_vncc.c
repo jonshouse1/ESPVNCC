@@ -68,12 +68,12 @@ void vncc_shutdown()
 	{
 		vncc_sock=-1;
 		shutdown(vncc_sock, 0);
-		close(vncc_sock);
 		lcd_textbuf_enable(TRUE, did_draw);							// did_draw==TRUE=clear screen
 		did_draw=FALSE;	
 	}												// back to text mode
+	shutdown(vncc_sock, 0);
+	close(vncc_sock);
 	vncc_state = VNCC_NOT_CONNECTED;
-	vncc_sock=-1;
 }
 
 
@@ -131,6 +131,7 @@ void vncc_doconnect()
 	vncc_sock =  socket(addr_family, SOCK_STREAM, ip_protocol);
         if (vncc_sock < 0) 
 	{
+		vncc_sock=-1;
 		ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
 		return;
 	}
@@ -145,8 +146,8 @@ void vncc_doconnect()
 		lcd_textbuf_printstring(st);
 		lcd_textbuf_printstring("\n");
 		ESP_LOGE(TAG, "%s", st);
+		close(vncc_sock);
 		vncc_sock=-1;
-		vncc_shutdown();
 		return;
         }
 }
