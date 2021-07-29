@@ -15,12 +15,10 @@
 #include "driver/gpio.h"
 #include "sdkconfig.h"
 
-
 #include "esp_freertos_hooks.h"
 #include "freertos/semphr.h"
 #include "esp_system.h"
 
-// LCD and touch screen
 #include "screen_driver.h"
 #include "touch_panel.h"
 
@@ -39,25 +37,27 @@
 //extern scr_driver_t		lcd_drv;
 extern touch_panel_driver_t	touch_drv;
 
-int			did_draw=FALSE;
+static char		vncc_rxbuf[4096];
+static char		vncc_txbuf[64];
 char 			vncc_host_ip[22];
-int			vncc_screennum=1;
-int			vncc_port=0;
+
 extern const char *TAG;
 extern int 		online;
 extern int  		link_up;
 extern int 		connection_state;
 extern int 		backlight;
-static int		vncc_state = VNCC_NOT_CONNECTED;
-static int		vncc_taskcreated = FALSE;
-static int		vncc_sock=-1;
-static char		vncc_rxbuf[4096];
-static char		vncc_txbuf[64];
-static int		vncc_busy = FALSE;
-static int		vncc_update_rate_hz = 25;
+
+static int		vncc_sock		= -1;
+static int		vncc_state 		= VNCC_NOT_CONNECTED;
+static int		vncc_taskcreated	= FALSE;
+static int		vncc_busy 		= FALSE;						// communicate between tasks
+static int		vncc_update_rate_hz 	= 25;
+static int		did_draw		= FALSE;						// true the moment we draw some pixels
+int			vncc_screennum		= 1;
+int			vncc_port		= 0;
 
 struct vnc_ServerInit	vncc_si;									// Keep a copy for reference
-char   			si_name[32];
+char			si_name[32];
 
 
 
@@ -82,14 +82,14 @@ int readbytes(int fd, char*buf , int n)
 {
 	int bytesread=0;
 	int bytestoread=0;
-	int cs=16;											// chunk size
+	int cs=512;											// chunk size
 	int len=0;
 
 	if (fd<0)
 		return(-1);
 	bytestoread=n;
-	if (n<cs)											// small read
-		cs=n;											// read it all in one go
+	if (n<cs)											// reading less than chunk size?
+		cs=n;											// try and read it all in one go
 	do
 	{
 		len = recv(fd, buf+bytesread, cs, 0);
@@ -244,7 +244,7 @@ void vncc_send_pointer_event(uint16_t x, uint16_t y, uint8_t msk)
 
 
 // Try and stay in sync with protocol by throwing away data when we seem out of sync
-// This can be removed when everything else is working as expected
+// This can be removed when everything is working as expected
 static void vncc_drain(char *s)
 {
 	int len=0;
@@ -308,8 +308,8 @@ void vncc_process_rectangle(int r)
 				{
 					readbytes(vncc_sock, (char*)&pixels, rec.width*2);		// read one lines worth of pixel data
 					jag_draw_icon(rec.xpos, rec.ypos+l, rec.width, 1, (char*)&pixels);
-					did_draw=TRUE;							// We did draw something on the LCD
 					//jag_draw_bitmap(rec.xpos, rec.ypos+l, rec.width, 1, (char*)&pixels);
+					did_draw=TRUE;							// We did draw something on the LCD
 				}
 			break;
 
@@ -363,8 +363,8 @@ static void vncc_process_framebufferupdate()
 			return;
 		}
 
-		for (r=0;r<fbu.num_of_rectangles;r++)							// read each rectangle
-			vncc_process_rectangle(r);
+		for (r=0;r<fbu.num_of_rectangles;r++)							// N rectangles follow
+			vncc_process_rectangle(r);							// read and process each one
 	}
 	else	ESP_LOGE(TAG,"vncc_process_framebufferupdate() expected %d read, got %d",sizeof(struct vnc_FramebufferUpdate),len);
 	vncc_busy = FALSE;
@@ -388,8 +388,11 @@ static void vncc_process_colormapentry()
 		printf("Got VNC_SMT_SETCOLORMAPENTRIES  %d RGB entries follow\n",cme.number_of_colors);
 
 		for (i=0;i<cme.number_of_colors;i++)
-			//len=recv(vncc_sock, (char*)&cme, sizeof(struct vnc_rgbentry), 0);
+		{
 			len=readbytes(vncc_sock, (char*)&cme, sizeof(struct vnc_rgbentry));
+			if (len!=sizeof(struct vnc_rgbentry))
+				return;									// Socket probably hung up
+		}
 	}
 	else	ESP_LOGE(TAG,"vncc_process_colormapentry() expected %d read %d",sizeof(struct vnc_colormapentry), len);
 }
@@ -410,11 +413,11 @@ static void vncc_client_task(void *pvParameters)
 		switch (vncc_state)
 		{
 			case VNCC_NOT_CONNECTED:
-				if (vncc_sock<=0)
+				if (vncc_sock<=0)						// No TCP connection yet ?
 				{
-					do
+					do							// then keep trying
 					{
-						vncc_doconnect();
+						vncc_doconnect();				// to connect
 						if (vncc_sock<=0)
 						{
 							lcd_textbuf_printstring("Failed to connect\n");
@@ -444,7 +447,7 @@ static void vncc_client_task(void *pvParameters)
 				{
 					ESP_LOGI(TAG, "Successfully connected %s",vncc_rxbuf);
 					sprintf(vncc_txbuf,"RFB 003.008\n");
-					err = send(vncc_sock, (char*)&vncc_txbuf, 12, 0);	// Send my suported version
+					err = send(vncc_sock, (char*)&vncc_txbuf, 12, 0);	// Send my version
 					if (err<0)	
 						vncc_shutdown();
 					vncc_state = VNCC_EXPECTING_NUM_SECURITY_TYPES;
@@ -457,6 +460,7 @@ static void vncc_client_task(void *pvParameters)
 			break;
 
 
+			//TODO: Some actual authentication
 			case VNCC_EXPECTING_NUM_SECURITY_TYPES:
 				bzero(&vncc_rxbuf,sizeof(vncc_rxbuf));
 				// Duno .. some bytes ...
@@ -578,12 +582,10 @@ static void vncc_periodic_request_and_touch_task(void *pvParameters)
 void vncc_connect(char *host_ip, int screennum)
 {
 	if (vncc_sock >0 && vncc_taskcreated==TRUE)						// already connected ?
-		vncc_shutdown();
+		vncc_shutdown();								// then hang up now
 
-	bzero(&vncc_host_ip, sizeof(vncc_host_ip));
 	strncpy(vncc_host_ip, host_ip, sizeof(vncc_host_ip));
 	vncc_screennum=screennum;
-
 	if (vncc_taskcreated!=TRUE)
 	{
 		xTaskCreate(vncc_client_task, "vnc_task", 20*1024, NULL, configMAX_PRIORITIES -1 , NULL);

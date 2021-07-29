@@ -146,8 +146,8 @@ void jag_draw_icon_ma(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char
 // across, down, width, height, pointer to rgb565 pixels
 void jag_draw_icon(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char *image)
 {
-ets_delay_us(320);
 	//printf("jag_draw_icon() %d %d %d %d %p\n",x,y,w,h,image);
+	ets_delay_us(350);							// Bug in ESP drivers or hardware issue ?
 	jag_draw_icon_s2(x, y, w, h, image);
 	//jag_draw_icon_ma(x, y, w, h, image);
 	//printf("GL:%u\tRL:%u\tWL:%u\n",lck_gl,lck_rl,lck_wl); 
