@@ -91,6 +91,22 @@ void vncc_shutdown()
 }
 
 
+// Close the TCP connection 
+//void vncc_shutdown()
+//{
+	//if (vncc_sock>0)
+	//{
+		//shutdown(vncc_sock, 0);
+		//lcd_textbuf_enable(TRUE, did_draw);							// did_draw==TRUE=clear screen
+		//did_draw=FALSE;	
+	//}												// back to text mode
+	//shutdown(vncc_sock, 0);
+	//close(vncc_sock);
+	//vncc_sock  = -1;
+	//vncc_state = VNCC_NOT_CONNECTED;
+//}
+
+
 // Read n bytes from socket(fd) into buf b with persistant tries for when sockets is giving short reads
 int readbytes(int fd, char*buf , int n)
 {
@@ -570,7 +586,7 @@ static void vncc_client_task(void *pvParameters)
 				}
 			break;
 		}
-		vTaskDelay(10 / portTICK_PERIOD_MS);
+		vTaskDelay(5 / portTICK_PERIOD_MS);
 	}
 }
 
