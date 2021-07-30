@@ -1,18 +1,19 @@
 /* 
-	jag.c
-
-	J A Graphics lib for ESP32 IDF (RTOS)
-	Assumes 16 bit display only
-
-	Every LCD write should go through this code.
-
-	painter_fonts are part of the esp-iot-solution touch screen calibration code.
-	The calibration code is linked in with the lcd driver support.
-
-		See:
-			esp-iot-solution/components/display/screen/controller_driver/
+ * jag.c
+ * J A Graphics , A simple graphics lib for ESP32 IDF (RTOS)
+ *
+ * Copyright (c) 2021 Jonathan Andrews. All rights reserved.
+ * This file is part of the VNC client for Arduino.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
 */
-
 
 #include <stdio.h>
 #include <string.h>
@@ -35,52 +36,14 @@
 
 #define JAG_MAXPIXELS_PERLINE	1200						// the maximum number of pixels for one displayed line
 
-
 extern const char *TAG;
 static scr_driver_t		jag_lcd_drv;
-static int 			jag_lock	= FALSE;			// one global lock, TRUE if lock is on
 static uint16_t			jag_lines	= 0;
 static uint16_t			jag_cols	= 0;
+//SemaphoreHandle_t 		xs		= NULL;
 
 
 
-// ESP32 has more than one core, the ESP idf will starts tasks on multiple cores simultaneously. If multiple processes
-// are calling in the lck_wl will be counting up.
-static uint32_t			lck_wl=0;					// Atomic type for ESP32
-static uint32_t			lck_gl=0;
-static uint32_t			lck_rl=0;
-
-
-// Am I skilled enough to write these as macros, probably not. Maybe I should use the freertos mutexes instead one day
-static inline void __attribute__((always_inline)) jag_grab_lock()
-{
-grrr:
-	while (jag_lock == TRUE)						// wait for the lock
-	{
-		vTaskDelay(1);							// in the schedular
-		lck_wl++;
-	}
-	if (jag_lock==TRUE)							// check nothing snuck in
-		goto grrr;							// if they did start over again
-	jag_lock = TRUE;							// now we have the lock
-	lck_gl++;
-}
-
-
-static inline void __attribute__((always_inline)) jag_release_lock()
-{
-	if (jag_lock!=TRUE)							// if the lock was not on
-	{
-		while(1)							// then crash, something is out of sequence
-			printf("jag_release_lock() The lock was not on\n");
-	}
-	jag_lock = FALSE;
-	lck_rl++;
-}
-
-
-
-// Shadow==TRUE, keep a copy of the LCD frame and refresh it from time to time
 void jag_init(scr_driver_t* driver, int cols, int lines)
 {
         jag_lcd_drv     = *driver;
@@ -90,6 +53,8 @@ void jag_init(scr_driver_t* driver, int cols, int lines)
 	ESP_LOGI(TAG,"jag_init() - lines=%d cols=%d",lines,cols);
 	scr_info_t lcd_info;
 	jag_lcd_drv.get_info(&lcd_info);
+	//if (xs == NULL)
+		//xs = xSemaphoreCreateMutex();
 	ESP_LOGI(TAG,"jag_init() - Screen name:%s | width:%d | height:%d", lcd_info.name, lcd_info.width, lcd_info.height);
 }
 
@@ -101,13 +66,17 @@ void jag_draw_bitmap(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *b
 {
 	esp_err_t	ret;
 
-	jag_grab_lock();
-	ret=jag_lcd_drv.draw_bitmap(x, y, w, h, bitmap);			// Call ili9341 driver, limited to 4000ish bytes
-	if (ret!=ESP_OK)							// set_window failed and no data was written
-	{
-		ESP_LOGE(TAG,"draw_bitmap returned %d",ret);
-	}
-	jag_release_lock();
+	//ets_delay_us(350);							// Bug in ESP drivers or hardware issue ?
+	//if (xSemaphoreTake( xs, ( TickType_t ) 1000/portTICK_PERIOD_MS ) == pdTRUE )
+	//{
+		ret=jag_lcd_drv.draw_bitmap(x, y, w, h, (uint16_t*)bitmap);		// Call ili9341 driver, limited to 4000ish bytes
+		if (ret!=ESP_OK)							// set_window failed and no data was written
+		{
+			ESP_LOGE(TAG,"draw_bitmap returned %d",ret);
+		}
+		//xSemaphoreGive(xs);
+	//}
+	//else ESP_LOGE(TAG,"jag_draw_bitmap() Failed to aquire semaphore");
 }
 
 
@@ -147,7 +116,6 @@ void jag_draw_icon_ma(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char
 void jag_draw_icon(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char *image)
 {
 	//printf("jag_draw_icon() %d %d %d %d %p\n",x,y,w,h,image);
-	ets_delay_us(350);							// Bug in ESP drivers or hardware issue ?
 	jag_draw_icon_s2(x, y, w, h, image);
 	//jag_draw_icon_ma(x, y, w, h, image);
 	//printf("GL:%u\tRL:%u\tWL:%u\n",lck_gl,lck_rl,lck_wl); 

@@ -1,6 +1,19 @@
 /* 
-	LCD with touch screen.
-	VNC connection to a host
+ * lcdtouchvnc.c
+ * ESP32 VNC Client for LCD Touch screens.
+ *
+ *
+ * Copyright (c) 2021 Jonathan Andrews. All rights reserved.
+ * This file is part of the VNC client for Arduino.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
 */
 
 #define VNC_SERVER_IPADDR 	"192.168.1.111"
@@ -32,19 +45,15 @@
 #include "lcd_vncc.h"
 
 
-// shared around
+// globals
 scr_driver_t				lcd_drv; 
 touch_panel_driver_t 			touch_drv;
-
-
-// globals
 const char *TAG = "lcdtouchvnc";
 char	client_ip[16];
 char	server_ip[16];
 int	online		= FALSE;					// TRUE = connected with an IP address?
 int	link_up		= FALSE;					// TRUE = network cable plugged in
 int	connection_state= 0;						// non zero when client_ip, server_ip or online change state
-
 
 
 
@@ -140,7 +149,7 @@ void app_main(void)
 	lcd_textbuf_init(&lcd_drv, &Font12, 23, 26);						// initialise the text terminal
 	lcd_textbuf_setcolors(COLOR_WHITE, COLOR_BLUE);
 	lcd_textbuf_enable(TRUE, TRUE);								// text terminal active and clear display
-	lcd_textbuf_printstring("POE LCD VNC V0.8 ...\n\n");
+	lcd_textbuf_printstring("POE LCD VNC V0.10 ...\n\n");
 
 	// Initialize TCP/IP network interface (should be called only once in application)
 	ESP_ERROR_CHECK(esp_netif_init());
@@ -213,7 +222,6 @@ void app_main(void)
 	/* start Ethernet driver state machine */
 	ESP_ERROR_CHECK(esp_eth_start(eth_handle));
 
-	//xTaskCreate(lcd_task, "lcdtask", 80*1024, NULL, configMAX_PRIORITIES-1, NULL);		// highest priority
 	xTaskCreate(yafdp_server_task, "yafdp_server", 16384, NULL, 0, NULL);			// 0 = lowest priority
 }
 

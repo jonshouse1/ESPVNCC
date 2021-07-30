@@ -1,4 +1,17 @@
-
+/* lcd_vncc.h
+ *
+ * Copyright (c) 2021 Jonathan Andrews. All rights reserved.
+ * This file is part of the VNC client for Arduino.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
 
 //  State machine
 
@@ -35,6 +48,14 @@
 #define VNC_ET_HEXTILE				5
 #define VNC_ET_TRLE				15
 #define VNC_ET_ZRLE				16
+
+
+struct __attribute__ ((__packed__)) vnc_servercuttext
+{
+	uint8_t		padding[3];
+	uint32_t	textlen;
+};
+
 struct __attribute__ ((__packed__)) vnc_ServerInit
 {
 	uint16_t	fbwidth;

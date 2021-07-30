@@ -1,6 +1,18 @@
 /* 
-	lcd_vncc.c
-	VNC client (vncc)
+ * lcd_vncc.c
+ * VNC client (vncc)
+ *
+ * Copyright (c) 2021 Jonathan Andrews. All rights reserved.
+ * This file is part of the VNC client for Arduino.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
 */
 
 
@@ -34,7 +46,6 @@
 #include "jag.h"
 #include "endian.h"
 
-//extern scr_driver_t		lcd_drv;
 extern touch_panel_driver_t	touch_drv;
 
 static char		vncc_rxbuf[4096];
@@ -51,13 +62,14 @@ static int		vncc_sock		= -1;
 static int		vncc_state 		= VNCC_NOT_CONNECTED;
 static int		vncc_taskcreated	= FALSE;
 static int		vncc_busy 		= FALSE;						// communicate between tasks
-static int		vncc_update_rate_hz 	= 25;
+static int		vncc_update_rate_hz 	= 50;
 static int		did_draw		= FALSE;						// true the moment we draw some pixels
 int			vncc_screennum		= 1;
 int			vncc_port		= 0;
 
 struct vnc_ServerInit	vncc_si;									// Keep a copy for reference
 char			si_name[32];
+
 
 
 
@@ -268,31 +280,29 @@ static void vncc_drain(char *s)
 
 void vncc_process_rectangle(int r)
 {
-	struct	vnc_rect			rec;
-	int	len =0;
-	int	l =0;
-
+	struct		vnc_rect	rec;
 	uint16_t	pixels[1024];
+        uint32_t	sclock;										// start time
+        uint32_t	eclock;										// end time
+	uint32_t	tms;										// time in millliseconds
+	int		len = 0;
+	int		l   = 0;
+
+        sclock = (uint32_t)clock();									// Default clock is 10ms resolution
+	vncc_busy = TRUE;
 	len = readbytes(vncc_sock, (char*)&rec, sizeof(struct vnc_rect));				// Get VNC rectange header
 	if (len==sizeof(struct vnc_rect))
 	{
-		//printf("xpos    %04X\n",rec.xpos);	// vnc rect before endian swap
-		//printf("ypos    %04X\n",rec.ypos);
-		//printf("width   %04X\n",rec.width);
-		//printf("height  %04X\n",rec.height);
-		//printf("ecoding %08X\n",rec.encoding_type);
 		rec.xpos		= bswap16(rec.xpos);
 		rec.ypos		= bswap16(rec.ypos);
 		rec.width		= bswap16(rec.width);
 		rec.height		= bswap16(rec.height);
 		rec.encoding_type	= bswap32(rec.encoding_type);
-		printf("rect %d\txpos=%05d\typos=%05d\twidth=%05d\theight=%05d\tet=%d\n",r+1,rec.xpos,rec.ypos,rec.width,rec.height,rec.encoding_type);
 
-		// This does not seem well documented, skip a rectangle 
+		// TODO: Check what last rectange really does and how to handle it
 		if (rec.encoding_type==-1 || rec.xpos==65535 || rec.ypos==65535 || rec.height==65535)	// "LastRect", server is cutting list short
 			return;
 
-		// Read and process data one line at a time, we do not have enough ram to read an entire framebuffer
 		if (rec.xpos>240 || rec.ypos>320 || rec.width>240 || rec.height>320)
 		{
 			ESP_LOGE(TAG,"vncc_process_rectangle() Out of range");
@@ -300,16 +310,19 @@ void vncc_process_rectangle(int r)
 			return;
 		}
 
-
+		did_draw=TRUE;										// We did draw something on the LCD
+		printf("rect %05d xpos=%05d ypos=%05d width=%05d height=%05d et=%d ",r+1,
+			rec.xpos, rec.ypos, rec.width, rec.height, rec.encoding_type);
 		switch (rec.encoding_type)
 		{
+			// Read and process data one line at a time, we do not have enough ram to read an entire framebuffer
 			case VNC_ET_RAW:								// 0x0000
 				for (l=0;l<rec.height;l++)						// for each line of the rectangle
 				{
 					readbytes(vncc_sock, (char*)&pixels, rec.width*2);		// read one lines worth of pixel data
-					jag_draw_icon(rec.xpos, rec.ypos+l, rec.width, 1, (char*)&pixels);
-					//jag_draw_bitmap(rec.xpos, rec.ypos+l, rec.width, 1, (char*)&pixels);
-					did_draw=TRUE;							// We did draw something on the LCD
+					ets_delay_us(375);						// Bug in ESP drivers or hardware issue ?
+					//jag_draw_icon(rec.xpos, rec.ypos+l, rec.width, 1, (char*)&pixels);
+					jag_draw_bitmap(rec.xpos, rec.ypos+l, rec.width, 1, (uint16_t*)&pixels);
 				}
 			break;
 
@@ -337,8 +350,12 @@ void vncc_process_rectangle(int r)
 				ESP_LOGE(TAG,"Uknown encoding type %d %08X",rec.encoding_type, rec.encoding_type);
 			break;
 		}
+        	eclock = (uint32_t)clock();
+        	tms = (uint32_t) (eclock - sclock) * 1000 / CLOCKS_PER_SEC;
+		printf("took %ums\n", tms);
 	}
 	else	ESP_LOGE(TAG,"vncc_process_rectangle() expected %d, got %d",sizeof(struct vnc_rect),len);
+	vncc_busy = FALSE;
 	return;
 }
 
@@ -349,7 +366,7 @@ static void vncc_process_framebufferupdate()
 	int    r=0;
 	int    len=0;
 
-	vncc_busy = TRUE;
+	//vncc_busy = TRUE;
 	len = readbytes(vncc_sock, (char*)&fbu, sizeof(struct vnc_FramebufferUpdate));
 	if (len==sizeof(struct vnc_FramebufferUpdate))
 	{
@@ -357,17 +374,17 @@ static void vncc_process_framebufferupdate()
 		printf("Got VNC_SMT_FRAMEBUFFERUPDATE %d rectangles\n",fbu.num_of_rectangles);
 		if (fbu.num_of_rectangles==0)
 			return;
-		if (fbu.num_of_rectangles >2048)							// unlikely, not a 4k display
+		if (fbu.num_of_rectangles >2048)						// unlikely, not a 4k display
 		{
 			vncc_drain("process_framebufferupdate()");
 			return;
 		}
 
-		for (r=0;r<fbu.num_of_rectangles;r++)							// N rectangles follow
-			vncc_process_rectangle(r);							// read and process each one
+		for (r=0;r<fbu.num_of_rectangles;r++)						// N rectangles follow
+			vncc_process_rectangle(r);						// read and process each one
 	}
 	else	ESP_LOGE(TAG,"vncc_process_framebufferupdate() expected %d read, got %d",sizeof(struct vnc_FramebufferUpdate),len);
-	vncc_busy = FALSE;
+	//vncc_busy = FALSE;
 }
 
 
@@ -380,7 +397,7 @@ static void vncc_process_colormapentry()
 	struct vnc_rgbentry		rgbe;
 	int i=0;
 
-	len = readbytes(vncc_sock, (char*)&cme, sizeof(struct vnc_colormapentry));			// Get header
+	len = readbytes(vncc_sock, (char*)&cme, sizeof(struct vnc_colormapentry));
 	if (len==sizeof(struct vnc_colormapentry))
 	{
 		cme.first_color		= bswap16(cme.first_color);
@@ -389,12 +406,31 @@ static void vncc_process_colormapentry()
 
 		for (i=0;i<cme.number_of_colors;i++)
 		{
-			len=readbytes(vncc_sock, (char*)&cme, sizeof(struct vnc_rgbentry));
+			len=readbytes(vncc_sock, (char*)&rgbe, sizeof(struct vnc_rgbentry));
 			if (len!=sizeof(struct vnc_rgbentry))
-				return;									// Socket probably hung up
+				return;								// Socket probably hung up
+			//printf("rgbe.red=%d\n",rgbe.red);
 		}
 	}
 	else	ESP_LOGE(TAG,"vncc_process_colormapentry() expected %d read %d",sizeof(struct vnc_colormapentry), len);
+}
+
+
+static void vncc_process_servercuttext()
+{
+	struct vnc_servercuttext	sct;
+	uint32_t i = 0;
+	char	 b;
+
+	readbytes(vncc_sock, (char*)&sct, sizeof(struct vnc_servercuttext));			// Get header
+	sct.textlen = bswap32(sct.textlen);
+	printf("Got VNC_SMT_SERVERCUTTEXT %d bytes\n",sct.textlen);
+	for (i=0;i<sct.textlen;i++)
+	{
+		readbytes(vncc_sock, (char*)&b, 1);
+		printf("%c",b);
+	}	
+	printf("\n");
 }
 
 
@@ -506,7 +542,7 @@ static void vncc_client_task(void *pvParameters)
 
 			case VNCC_MAINLOOP:
 				len=readbytes(vncc_sock, (char*)&msg_type,1);
-				printf("msg_type=%02X (%d)\n",msg_type,msg_type); fflush(stdout);
+				//printf("msg_type=%02X (%d)\n",msg_type,msg_type); fflush(stdout);
 				switch (msg_type)
 				{
 					case VNC_SMT_FRAMEBUFFERUPDATE:				// 0
@@ -517,17 +553,16 @@ static void vncc_client_task(void *pvParameters)
 						vncc_process_colormapentry();
 					break;
 	
-					case VNC_SMT_BELL:
+					case VNC_SMT_BELL:					// 2
 						ESP_LOGE(TAG,"VNC_SMT_BELL Not implimented yet");
 					break;
 	
-					case VNC_SMT_SERVERCUTTEXT:
-						ESP_LOGE(TAG,"VNC_SMT_SERVERCUTTEXT Not implimented yet");
-						vncc_drain("mainloop");
+					case VNC_SMT_SERVERCUTTEXT:				// 3
+						vncc_process_servercuttext();
 					break;
 
 					default:
-						ESP_LOGE(TAG,"got msg_type %02X",msg_type);
+						ESP_LOGE(TAG,"got msg_type %02X ?",msg_type);
 						vncc_drain("mainloop");
 					break;
 				}
