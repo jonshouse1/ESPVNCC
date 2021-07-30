@@ -71,21 +71,23 @@ struct vnc_ServerInit	vncc_si;									// Keep a copy for reference
 char			si_name[32];
 
 
-
-
-// Close the TCP connection 
 void vncc_shutdown()
 {
-	if (vncc_sock>0)
+	static int inprogress=FALSE;									// Two process can call us
+
+	if (inprogress==TRUE)										// function already in progress?
+		return;											// then skip it
+	inprogress = TRUE;
+	if (vncc_sock >0)										// still connected ?
 	{
-		vncc_sock=-1;
-		shutdown(vncc_sock, 0);
-		lcd_textbuf_enable(TRUE, did_draw);							// did_draw==TRUE=clear screen
-		did_draw=FALSE;	
-	}												// back to text mode
-	shutdown(vncc_sock, 0);
+		shutdown(vncc_sock, 0);									// tell host we are leaving
+		lcd_textbuf_enable(TRUE, did_draw);
+		did_draw = FALSE;
+	}
 	close(vncc_sock);
+	vncc_sock = -1;
 	vncc_state = VNCC_NOT_CONNECTED;
+	inprogress = FALSE;
 }
 
 
