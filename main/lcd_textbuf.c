@@ -1,14 +1,28 @@
 /* 
-	lcd_textbuf.c
-	Verion 0.3
-	Last Modified 20 Jul 2021
+ * lcd_textbuf.c
+ * Text display for ESP32, esp-idf
+ *
+ * Copyright (c) 2021 Jonathan Andrews. All rights reserved.
+ * This file is part of ESPVNCC
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+*/
 
+
+/* 
+	lcd_textbuf.c
 	Text framebuffer for ESP IDF
 
 	See /esp/esp-iot-solution/components/display/touch_panel/calibration/
 	basic_painter/fonts/
 	font12.c  font16.c  font20.c  font24.c  font8.c  painter_fonts.h
-
 
 	For Portrait 240 Wide, 320 Heigh
 	Font		Lines		Cols	
@@ -52,7 +66,8 @@
 #include "jag.h"
 
 
-#define MAXCHARPIXELBUF		18*25*sizeof(uint16_t)				// Maximum size of buffer to hold one character of pixels in largest font
+// Maximum size of buffer to hold one character of pixels in largest font
+#define MAXCHARPIXELBUF		18*25*sizeof(uint16_t)
 extern const char *TAG;
 
 
@@ -140,12 +155,14 @@ void lcd_textbuf_display()
 			{
 				if (textbuf[l][c]>=' ' && textbuf_enable==TRUE)		// Valud ASCII for our font ?
 				{
-					jag_draw_char((textbuf_font->Width+2)*c, (textbuf_font->Height+2)*l, textbuf[l][c], textbuf_font, textbuf_bgcolor, textbuf_fgcolor);
+					jag_draw_char((textbuf_font->Width+2)*c, (textbuf_font->Height+2)*l, 
+							textbuf[l][c], textbuf_font, textbuf_bgcolor, textbuf_fgcolor);
 				}
 				// redraw on then write an ASCII space
 				if (textbuf[l][c]<' ' && textbuf_redraw==TRUE && textbuf_enable==TRUE)
 				{
-					jag_draw_char((textbuf_font->Width+2)*c, (textbuf_font->Height+2)*l, ' ', textbuf_font, textbuf_bgcolor, textbuf_fgcolor);
+					jag_draw_char((textbuf_font->Width+2)*c, (textbuf_font->Height+2)*l, 
+							' ', textbuf_font, textbuf_bgcolor, textbuf_fgcolor);
 				}
 			}
 			ptextbuf[l][c] = textbuf[l][c];
