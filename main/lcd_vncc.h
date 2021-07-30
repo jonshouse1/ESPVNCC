@@ -1,7 +1,7 @@
 /* lcd_vncc.h
  *
  * Copyright (c) 2021 Jonathan Andrews. All rights reserved.
- * This file is part of the VNC client for Arduino.
+ * This file is part of ESPVNCC
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
