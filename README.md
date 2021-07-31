@@ -21,6 +21,12 @@ Then VNC connect to it with this code.
 
 At the moment only "raw" encoding is supported for 16 bit RGB (565) format.
 
+This project is not reliable at the moment, a delay is required 
+ets_delay_us() before the SPI display write, otherwise the screen corrupts.
+Also the code randomly locks up with "bus_lock: spi_bus_lock_acquire_end(694): 
+Cannot release a lock that hasn't been acquired."  Both these issues may be
+driver issues with the ESP-IDF and ESP-IOT-SOLUTION code or possibly something
+unique to the hardware configuration I am using.
 
 ![Screenshot](vncc_screenshot.jpg)
 

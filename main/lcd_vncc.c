@@ -48,8 +48,8 @@
 
 extern touch_panel_driver_t	touch_drv;
 
-static char		vncc_rxbuf[4096];
-static char		vncc_txbuf[64];
+static char		vncc_rxbuf[2048];
+static char		vncc_txbuf[512];
 char 			vncc_host_ip[22];
 
 extern const char *TAG;
@@ -234,6 +234,7 @@ static void vncc_send_framebuffer_update_request(int x, int y, int w, int h, uin
 	if (len!=sizeof(struct vnc_FramebufferUpdateRequest))
 	{
 		ESP_LOGE(TAG,"Got %d on send()  vncc_sock=%d",len,vncc_sock);
+		vncc_busy = TRUE;
 		vncc_shutdown();
 	}
 }
@@ -319,6 +320,8 @@ void vncc_process_rectangle(int r)
 	uint32_t	tms;										// time in millliseconds
 	int		len = 0;
 	int		l   = 0;
+	int		dw  = 0;									// display width
+	int		dh  = 0; 									// display height
 
         sclock = (uint32_t)clock();									// Default clock is 10ms resolution
 	vncc_busy = TRUE;
@@ -335,19 +338,21 @@ void vncc_process_rectangle(int r)
 		if (rec.encoding_type==-1 || rec.xpos==65535 || rec.ypos==65535 || rec.height==65535)	// "LastRect", server is cutting list short
 			return;
 
-		if (rec.xpos>240 || rec.ypos>320 || rec.width>240 || rec.height>320)
+		printf("rect %05d xpos=%05d ypos=%05d width=%05d height=%05d et=%d ",r+1,
+			rec.xpos, rec.ypos, rec.width, rec.height, rec.encoding_type);
+		dw = jag_get_display_width();								// Check requested rectangle fits on display
+		dh = jag_get_display_height();
+		if (rec.width > dw || rec.height >dh || rec.xpos+rec.width >dw || rec.ypos+rec.height >dh)
 		{
-			ESP_LOGE(TAG,"vncc_process_rectangle() Out of range");
+			ESP_LOGE(TAG,"vncc_process_rectangle() Rectange larger than or clips display dimensions %d x %d",dw,dh);
 			vncc_drain("process_rectangle");
 			return;
 		}
 
 		did_draw=TRUE;										// We did draw something on the LCD
-		printf("rect %05d xpos=%05d ypos=%05d width=%05d height=%05d et=%d ",r+1,
-			rec.xpos, rec.ypos, rec.width, rec.height, rec.encoding_type);
 		switch (rec.encoding_type)
 		{
-			// Read and process data one line at a time, we do not have enough ram to read an entire framebuffer
+			// Read and process data one line at a time, we do not have enough RAM to read an entire framebuffer
 			case VNC_ET_RAW:								// 0x0000
 				for (l=0;l<rec.height;l++)						// for each line of the rectangle
 				{
@@ -467,6 +472,41 @@ static void vncc_process_servercuttext()
 
 
 
+// The VNC server and the client do not agree on display dimensions
+void display_mismatch()
+{
+	int w = jag_get_display_width();
+	int h = jag_get_display_height();
+	char st[256];
+
+	lcd_textbuf_printstring("Display mismatch, got: \n");
+	sprintf(st,"%d x %d bpp=%d\n",vncc_si.fbwidth, vncc_si.fbheight, vncc_si.pf_depth);
+	lcd_textbuf_printstring(st);
+	if (vncc_si.fbwidth != w)
+	{
+		sprintf(st,"Got w=%d need %d\n", vncc_si.fbwidth, w);
+		lcd_textbuf_printstring(st);
+		ESP_LOGE(TAG,"%s",st);
+	}
+
+	if (vncc_si.fbheight != h)
+	{
+		sprintf(st,"Got h=%d need %d\n", vncc_si.fbheight, h);
+		lcd_textbuf_printstring(st);
+		ESP_LOGE(TAG,"%s",st);
+	}
+
+	if (vncc_si.pf_depth != 16)
+	{
+		sprintf(st,"Got bpp=%d need 16\n", vncc_si.pf_depth);
+		lcd_textbuf_printstring(st);
+		ESP_LOGE(TAG,"%s",st);
+	}
+}
+
+
+
+
 // TODO:  Extract server major and minor verison, check we have a new enough version
 static void vncc_client_task(void *pvParameters)
 {
@@ -481,6 +521,7 @@ static void vncc_client_task(void *pvParameters)
 		switch (vncc_state)
 		{
 			case VNCC_NOT_CONNECTED:
+				vncc_busy = FALSE;
 				if (vncc_sock<=0)						// No TCP connection yet ?
 				{
 					do							// then keep trying
@@ -495,7 +536,6 @@ static void vncc_client_task(void *pvParameters)
 						{
 							lcd_textbuf_printstring("Got connection\n");
 							ESP_LOGI(TAG,"Got connection");
-							bzero(&vncc_rxbuf,sizeof(vncc_rxbuf));
 							vncc_state = VNCC_EXPECTING_GREETING;
 						}
 					} while (vncc_sock<=0);
@@ -505,7 +545,8 @@ static void vncc_client_task(void *pvParameters)
 
 
 			case VNCC_EXPECTING_GREETING:
-				len = recv(vncc_sock, vncc_rxbuf, sizeof(vncc_rxbuf) - 1, 0);
+				bzero(&vncc_rxbuf,sizeof(vncc_rxbuf));
+				len = recv(vncc_sock, vncc_rxbuf, sizeof(vncc_rxbuf) - 1, 0);	// -1, keep the last buffer byte a zero
 				if (len!=12)
 				{
 					ESP_LOGE(TAG,"expected 12 bytes, got %d",len);
@@ -564,10 +605,20 @@ static void vncc_client_task(void *pvParameters)
 				if (len==sizeof(struct vnc_ServerInit))
 					process_server_init((struct vnc_ServerInit*)&vncc_rxbuf);
 				else	vncc_shutdown();
-				vncc_send_setencodings(); 
-				lcd_textbuf_enable(FALSE, FALSE);				// Make sure task stops driving SPI LCD
-				vncc_send_framebuffer_update_request(0, 0, 240, 320, 0);	// ASk for entire screen now
-				vncc_state = VNCC_MAINLOOP;
+			//JA new, test
+				if (vncc_si.fbwidth != jag_get_display_width() || vncc_si.fbheight != jag_get_display_height() || vncc_si.pf_depth != 16)
+				{
+					display_mismatch();
+					vncc_shutdown();
+					vTaskDelay(8000 / portTICK_PERIOD_MS);
+				}
+				else
+				{
+					vncc_send_setencodings(); 
+					lcd_textbuf_enable(FALSE, FALSE);			// Make sure task stops driving SPI LCD
+					vncc_send_framebuffer_update_request(0, 0, 240, 320, 0);	// ASk for entire screen now
+					vncc_state = VNCC_MAINLOOP;
+				}
 			break;
 
 
@@ -618,7 +669,7 @@ static void vncc_periodic_request_and_touch_task(void *pvParameters)
 
 	while (1)
 	{
-		if (vncc_state==VNCC_MAINLOOP)
+		if (vncc_state==VNCC_MAINLOOP && vncc_sock >0)
 		{
 			if (vncc_busy!=TRUE)							// Connected and otherwise idle
 				vncc_send_framebuffer_update_request(0, 0, 240, 320, 1);	// Ask for rectangles (incremental)

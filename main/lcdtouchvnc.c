@@ -143,13 +143,23 @@ static void lost_ip_event_handler()
 #define	PIN_PHY_POWER	12					
 void app_main(void)
 {
+	int w=240;
+	int h=320;
+	//int w=320;
+	//int h=240;
+
 	bzero(&lcd_drv, sizeof(scr_driver_t));
-	lcd_init((scr_driver_t*)&lcd_drv, (touch_panel_driver_t*)&touch_drv);			// initialise the SPI LCD driver
-	jag_init((scr_driver_t*)&lcd_drv, 240, 320);						// initialise my graphics library
-	lcd_textbuf_init(&lcd_drv, &Font12, 23, 26);						// initialise the text terminal
+	lcd_init(w, h);									// initialise the SPI LCD driver
+	jag_init((scr_driver_t*)&lcd_drv, w, h);						// initialise my graphics library
+
+	if (w>h)
+		lcd_textbuf_init(&lcd_drv, &Font12, 26, 23);					// initialise the text terminal
+	else	lcd_textbuf_init(&lcd_drv, &Font12, 23, 26);					// initialise the text terminal
+
+
 	lcd_textbuf_setcolors(COLOR_WHITE, COLOR_BLUE);
 	lcd_textbuf_enable(TRUE, TRUE);								// text terminal active and clear display
-	lcd_textbuf_printstring("POE LCD VNC V0.10 ...\n\n");
+	lcd_textbuf_printstring("POE LCD VNC V0.11 ...\n\n");
 
 	// Initialize TCP/IP network interface (should be called only once in application)
 	ESP_ERROR_CHECK(esp_netif_init());
