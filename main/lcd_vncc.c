@@ -73,7 +73,7 @@ char			si_name[32];
 
 void vncc_shutdown()
 {
-	static int inprogress=FALSE;									// Two process can call us
+	static int inprogress=FALSE;									// Multiple tasks can call us
 
 	if (inprogress==TRUE)										// function already in progress?
 		return;											// then skip it
@@ -81,7 +81,7 @@ void vncc_shutdown()
 	if (vncc_sock >0)										// still connected ?
 	{
 		shutdown(vncc_sock, 0);									// tell host we are leaving
-		lcd_textbuf_enable(TRUE, did_draw);
+		lcd_textbuf_enable(TRUE, did_draw);							// Back to text mode optionally CLS
 		did_draw = FALSE;
 	}
 	close(vncc_sock);
@@ -251,8 +251,37 @@ void vncc_send_pointer_event(uint16_t x, uint16_t y, uint8_t msk)
 	len = send(vncc_sock, (char*)&pev, sizeof(struct vnc_PointerEvent), 0);
 	if (len!=sizeof(struct vnc_PointerEvent))
 	{
-		ESP_LOGE(TAG,"vncc_send_pointer_event() - expected %d got %d",sizeof(struct vnc_PointerEvent),len);
+		ESP_LOGE(TAG,"vncc_send_pointer_event() - expected %d got %d",sizeof(struct vnc_PointerEvent), len);
 		vncc_shutdown();
+	}
+}
+
+
+
+void vncc_send_setencodings()
+{
+	struct	vnc_SetEncodings	se;
+	struct  vnc_send_encoding_type	et;
+	int 	len=0;
+
+	se.msg_type = VNC_CMT_SETENCODINGS; 
+	se.padding = 0;
+	se.number_of_encodings = bswap16(1);							// List of 1 at the moment	
+	len = send(vncc_sock, (char*)&se, sizeof(struct vnc_SetEncodings), 0);
+	if (len!=sizeof(struct vnc_SetEncodings))
+	{
+		ESP_LOGE(TAG,"vncc_send_setencodings() se - expected %d got %d",sizeof(struct vnc_SetEncodings), len); 
+		vncc_shutdown();
+		return;
+	}
+
+	et.encoding_type = bswap32(VNC_ET_RAW);							// Send the list of 1
+	len = send(vncc_sock, (char*)&et, sizeof(struct vnc_send_encoding_type), 0);
+	if (len!=sizeof(struct vnc_SetEncodings))
+	{
+		ESP_LOGE(TAG,"vncc_send_setencodings() et - expected %d got %d",sizeof(struct vnc_SetEncodings), len); 
+		vncc_shutdown();
+		return;
 	}
 }
 
@@ -535,10 +564,9 @@ static void vncc_client_task(void *pvParameters)
 				if (len==sizeof(struct vnc_ServerInit))
 					process_server_init((struct vnc_ServerInit*)&vncc_rxbuf);
 				else	vncc_shutdown();
-				// TODO: SetPixelFormat
-				// TODO: SetEncodings
+				vncc_send_setencodings(); 
 				lcd_textbuf_enable(FALSE, FALSE);				// Make sure task stops driving SPI LCD
-				vncc_send_framebuffer_update_request(0, 0, 240, 320, 0);	// Send entire screen now
+				vncc_send_framebuffer_update_request(0, 0, 240, 320, 0);	// ASk for entire screen now
 				vncc_state = VNCC_MAINLOOP;
 			break;
 
@@ -593,7 +621,7 @@ static void vncc_periodic_request_and_touch_task(void *pvParameters)
 		if (vncc_state==VNCC_MAINLOOP)
 		{
 			if (vncc_busy!=TRUE)							// Connected and otherwise idle
-				vncc_send_framebuffer_update_request(0, 0, 240, 320, 1);	// Ask for data
+				vncc_send_framebuffer_update_request(0, 0, 240, 320, 1);	// Ask for rectangles (incremental)
 
 			touch_drv.read_point_data(&points);
 			x=points.curx[0];
