@@ -77,10 +77,10 @@ struct __attribute__ ((__packed__)) vnc_ServerInit
 
 struct __attribute__ ((__packed__)) vnc_PointerEvent
 {
-	uint8_t			msg_type;
-	uint8_t			button_mask;		// Mask for 8 button, 1=down
-	uint16_t		xpos;
-	uint16_t		ypos;	
+	uint8_t		msg_type;
+	uint8_t		button_mask;			// Mask for 8 button, 1=down
+	uint16_t	xpos;
+	uint16_t	ypos;	
 };
 
 struct __attribute__ ((__packed__)) vnc_FramebufferUpdateRequest
@@ -114,41 +114,40 @@ struct __attribute__ ((__packed__)) vnc_rect
 
 struct __attribute__ ((__packed__)) vnc_colormapentry
 {
-	//uint8_t		 msg_type     
-	uint8_t			padding;
-	uint16_t		first_color;
-	uint16_t		number_of_colors;
+	uint8_t		padding;
+	uint16_t	first_color;
+	uint16_t	number_of_colors;
 };
 
 
 struct __attribute__ ((__packed__)) vnc_rgbentry
 {
-	uint16_t		red;
-	uint16_t		green;
-	uint16_t		blue;
+	uint16_t	red;
+	uint16_t	green;
+	uint16_t	blue;
 };
 
 
 struct __attribute__ ((__packed__)) vnc_SetPixelFormat
 {
-	uint8_t			padding[3];
-	uint16_t		pixel_format;
+	uint8_t		padding[3];
+	uint16_t	pixel_format;
 };
 
 
 // A number of int32_t follow SetEncodings, taken from encoding type VNC_ET_XXX
 struct __attribute__ ((__packed__)) vnc_SetEncodings
 {
-	uint8_t			msg_type;
-	uint8_t			padding;
-	uint16_t		number_of_encodings;
+	uint8_t		msg_type;
+	uint8_t		padding;
+	uint16_t	number_of_encodings;
 };
 
 
 // Send a single encoding type
 struct __attribute__ ((__packed__)) vnc_send_encoding_type
 {
-	int32_t			encoding_type;
+	int32_t		encoding_type;
 };
 
 
