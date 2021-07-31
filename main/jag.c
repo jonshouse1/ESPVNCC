@@ -218,4 +218,13 @@ void jag_draw_string_centered(uint16_t x, uint16_t y, char* text, const font_t *
 
 
 
+int jag_get_display_width()
+{
+	return(jag_cols);
+}
+
+int jag_get_display_height()
+{
+	return(jag_lines);
+}
 

@@ -34,6 +34,9 @@ void jag_cls(uint16_t color);
 void jag_draw_char(uint16_t x, uint16_t y, char ascii_char, const font_t *font, uint16_t bgcolor, uint16_t fgcolor);
 void jag_draw_string(uint16_t x, uint16_t y, char* text, const font_t *font, uint16_t bgcolor, uint16_t fgcolor);
 void jag_draw_string_centered(uint16_t x, uint16_t y, char* text, const font_t *font, uint16_t bgcolor, uint16_t fgcolor);
+int  jag_get_display_width();
+int  jag_get_display_height();
+
 
 
 
