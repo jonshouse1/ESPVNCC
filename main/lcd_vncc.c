@@ -748,13 +748,14 @@ static void vncc_periodic_request_and_touch_task(void *pvParameters)
 
 void vncc_connect(char *host_ip, int screennum)
 {
-	if (vncc_sock >0 && vncc_taskcreated==TRUE)						// already connected ?
+	if (vncc_sock >0)									// already connected ?
 		vncc_shutdown();								// then hang up now
 
 	strncpy(vncc_host_ip, host_ip, sizeof(vncc_host_ip));
 	vncc_screennum=screennum;
 	if (vncc_taskcreated!=TRUE)
 	{
+		vncc_taskcreated=TRUE;
 		xTaskCreate(vncc_client_task, "vnc_task", 20*1024, NULL, configMAX_PRIORITIES -1 , NULL);
 		xTaskCreate(vncc_periodic_request_and_touch_task, "req_task", 8*1024, NULL, 5, NULL);
 	}
