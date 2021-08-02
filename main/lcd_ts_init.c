@@ -17,11 +17,9 @@
 #include "sdkconfig.h"
 
 
-//JA
 #include "esp_freertos_hooks.h"
 #include "freertos/semphr.h"
 #include "esp_system.h"
-//#include "lwip/sockets.h"
 
 // PWM for backlight
 #include "driver/ledc.h"
@@ -30,11 +28,6 @@
 #include "screen_driver.h"
 #include "touch_panel.h"
 #include "jag.h"
-
-
-//#include "lcd_ts_init.h"
-//#include "global.h"
-//#include "lcd_text_terminal.h"
 
 
 // Dont use GPIO1(TX) and GPIO3(RX)
@@ -63,7 +56,6 @@
 #define GPIO_MISO		34 
 
 
-// from lcdtouchvnc.c
 extern const char *TAG;
 extern scr_driver_t			lcd_drv;
 extern touch_panel_driver_t		touch_drv;
@@ -104,19 +96,27 @@ void led_pwm_set(int b)
 }
 
 
+// Change LCD rotation
+// possible rotations	portrait:   SCR_DIR_LRTB,  SCR_DIR_LRBT,  SCR_DIR_RLTB,  SCR_DIR_RLBT
+// 			landscape:  SCR_DIR_TBLR,  SCR_DIR_BTLR,  SCR_DIR_TBRL,  SCR_DIR_BTRL
+void lcd_rotate()
+{
+}
+
+
 
 // Inil lcd display and touch screen
 void lcd_init(int w, int h)
 {
-	int p				= TRUE;				// default to portrait
 	spi_bus_handle_t		bus_handle;
 	scr_interface_driver_t 		*iface_drv;
 
-	if (w >h)							// screen wider than tall ?
-		p=FALSE;						// then landscape
+//TODO: PWM disabled for now, just in case it is an issue
+	//led_pwm_init();
+	//led_pwm_set(255);						// turn backlight on
+	gpio_set_direction(GPIO_LCDBL, GPIO_MODE_OUTPUT);
+	gpio_set_level(GPIO_LCDBL, 1);
 
-	led_pwm_init();
-	led_pwm_set(255);						// turn backlight on
 	spi_config_t		bus_conf =
 	{
 		.miso_io_num	= GPIO_MISO,
@@ -137,7 +137,6 @@ void lcd_init(int w, int h)
 	};
 	scr_interface_create(SCREEN_IFACE_SPI, &spi_lcd_cfg, &iface_drv);
     
-	// possible rotations SCR_DIR_TBLR  SCR_DIR_LRBT   SCR_DIR_BTRL  SCRI_DIR_LRTB
 	scr_controller_config_t lcd_cfg = 
 	{
 		.interface_drv		= iface_drv,
@@ -151,15 +150,9 @@ void lcd_init(int w, int h)
 		.height			= h,
 		.rotate			= SCR_DIR_LRBT,
 	};
-	if (p != TRUE)							// landscape ?
-	{
-		lcd_cfg.width  = h;
-		lcd_cfg.height = w;
-		lcd_cfg.rotate = SCR_DIR_TBLR;
-	}
 
 	scr_find_driver(SCREEN_CONTROLLER_ILI9341, &lcd_drv);
-	ESP_LOGI(TAG, "JA doing lcd_drv init");
+	ESP_LOGI(TAG, "lcd_drv init()  w=%d h=%d",w,h);
 	lcd_drv.init(&lcd_cfg);
 
 
@@ -179,15 +172,9 @@ void lcd_init(int w, int h)
         	.height		= h,
         	.direction	= TOUCH_DIR_LRBT,
     	};
-	if (p != TRUE)
-	{
-		touch_cfg.width  = h;
-		touch_cfg.height = w;
-		touch_cfg.direction = SCR_DIR_TBLR;
-	}
 
 	touch_panel_find_driver(TOUCH_PANEL_CONTROLLER_XPT2046, &touch_drv);
-	ESP_LOGI(TAG, "doing touch_drv init");
+	ESP_LOGI(TAG, "touch_drv init()  w=%d h=%d",w,h);
 
 	touch_drv.init(&touch_cfg);
 	touch_drv.calibration_run(&lcd_drv, false);		// true=force, false read from flash if possible

@@ -24,7 +24,8 @@
 #define FALSE                   0
 
 
-void jag_init(scr_driver_t* driver, int cols, int lines);
+//void jag_init(scr_driver_t* driver, int cols, int lines);
+void jag_init(scr_driver_t* driver);
 void jag_draw_bitmap(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *bitmap);
 void jag_draw_icon(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char *image);
 void jag_draw_iconm(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char *image);

@@ -35,23 +35,24 @@
 #include "painter_fonts.h"
 
 #define JAG_MAXPIXELS_PERLINE	1200						// the maximum number of pixels for one displayed line
+#define DRIVER_BUG								// set this to add delays before display writes
 
 extern const char *TAG;
 static scr_driver_t		jag_lcd_drv;
-static uint16_t			jag_lines	= 0;
-static uint16_t			jag_cols	= 0;
+static uint16_t			jag_width	= 0;	// was lines
+static uint16_t			jag_height	= 0;	// was cols
 //SemaphoreHandle_t 		xs		= NULL;
 
 
 
-void jag_init(scr_driver_t* driver, int cols, int lines)
+void jag_init(scr_driver_t* driver)
 {
         jag_lcd_drv     = *driver;
-	jag_lines	= lines;
-	jag_cols	= cols;	
+	scr_info_t	lcd_info;
 
-	ESP_LOGI(TAG,"jag_init() - lines=%d cols=%d",lines,cols);
-	scr_info_t lcd_info;
+	jag_lcd_drv.get_info(&lcd_info);
+	jag_width	= lcd_info.width;
+	jag_height	= lcd_info.height;
 	jag_lcd_drv.get_info(&lcd_info);
 	//if (xs == NULL)
 		//xs = xSemaphoreCreateMutex();
@@ -66,7 +67,9 @@ void jag_draw_bitmap(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *b
 {
 	esp_err_t	ret;
 
-	//ets_delay_us(350);							// Bug in ESP drivers or hardware issue ?
+#ifdef DRIVER_BUG
+	ets_delay_us(375);								// hardware or driver issue ?
+#endif
 	//if (xSemaphoreTake( xs, ( TickType_t ) 1000/portTICK_PERIOD_MS ) == pdTRUE )
 	//{
 		ret=jag_lcd_drv.draw_bitmap(x, y, w, h, (uint16_t*)bitmap);		// Call ili9341 driver, limited to 4000ish bytes
@@ -78,6 +81,9 @@ void jag_draw_bitmap(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *b
 	//}
 	//else ESP_LOGE(TAG,"jag_draw_bitmap() Failed to aquire semaphore");
 }
+
+//                                        jag_draw_bitmap(rec.xpos, rec.ypos+l, rec.width, 1, (uint16_t*)&pixels);
+
 
 
 
@@ -130,10 +136,10 @@ void jag_fill_lines(uint16_t startline, uint16_t numlines, uint16_t color)
 	uint16_t	buf[JAG_MAXPIXELS_PERLINE];
 	uint16_t l=0;
 
-	for (l=0;l<jag_cols;l++)
+	for (l=0;l<jag_width;l++)
 		buf[l]=color;
 	for (l=startline;l<startline+numlines;l++)
-		jag_draw_bitmap(0, l, jag_cols, 1, (uint16_t*)&buf);	
+		jag_draw_bitmap(0, l, jag_width, 1, (uint16_t*)&buf);	
 }
 
 
@@ -148,8 +154,8 @@ void jag_fill_area(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
 // Clear entire display to a color
 void jag_cls(uint16_t color)
 {
-	ESP_LOGI(TAG,"clearing %d lines of %d pixels",jag_lines,jag_cols);
-	jag_fill_lines(0, jag_lines, color); 
+	ESP_LOGI(TAG,"clearing %d lines of %d pixels",jag_height,jag_width);
+	jag_fill_lines(0, jag_height, color); 
 }
 
 
@@ -220,11 +226,11 @@ void jag_draw_string_centered(uint16_t x, uint16_t y, char* text, const font_t *
 
 int jag_get_display_width()
 {
-	return(jag_cols);
+	return(jag_width);
 }
 
 int jag_get_display_height()
 {
-	return(jag_lines);
+	return(jag_height);
 }
 

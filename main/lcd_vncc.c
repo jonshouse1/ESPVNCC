@@ -52,10 +52,10 @@ static char		vncc_rxbuf[2048];
 static char		vncc_txbuf[512];
 char 			vncc_host_ip[22];
 
-extern const char *TAG;
+extern const char 	*TAG;
 extern int 		online;
-extern int  		link_up;
-extern int 		connection_state;
+//extern int  		link_up;
+//extern int 		connection_state;
 extern int 		backlight;
 
 static int		vncc_sock		= -1;
@@ -66,9 +66,11 @@ static int		vncc_update_rate_hz 	= 50;
 static int		did_draw		= FALSE;						// true the moment we draw some pixels
 int			vncc_screennum		= 1;
 int			vncc_port		= 0;
+char x4='4';
 
 struct vnc_ServerInit	vncc_si;									// Keep a copy for reference
 char			si_name[32];
+char x5='5';
 
 
 void vncc_shutdown()
@@ -357,7 +359,6 @@ void vncc_process_rectangle(int r)
 				for (l=0;l<rec.height;l++)						// for each line of the rectangle
 				{
 					readbytes(vncc_sock, (char*)&pixels, rec.width*2);		// read one lines worth of pixel data
-					ets_delay_us(375);						// Bug in ESP drivers or hardware issue ?
 					//jag_draw_icon(rec.xpos, rec.ypos+l, rec.width, 1, (char*)&pixels);
 					jag_draw_bitmap(rec.xpos, rec.ypos+l, rec.width, 1, (uint16_t*)&pixels);
 				}
@@ -479,29 +480,48 @@ void display_mismatch()
 	int h = jag_get_display_height();
 	char st[256];
 
-	lcd_textbuf_printstring("Display mismatch, got: \n");
-	sprintf(st,"%d x %d bpp=%d\n",vncc_si.fbwidth, vncc_si.fbheight, vncc_si.pf_depth);
-	lcd_textbuf_printstring(st);
+	lcd_textbuf_printstring("Display mismatch\n");
 	if (vncc_si.fbwidth != w)
 	{
-		sprintf(st,"Got w=%d need %d\n", vncc_si.fbwidth, w);
+		sprintf(st,"Got w=%d need %d", vncc_si.fbwidth, w);
 		lcd_textbuf_printstring(st);
 		ESP_LOGE(TAG,"%s",st);
 	}
+	else
+	{
+		sprintf(st,"Got w=%d  OK", vncc_si.fbwidth);
+		lcd_textbuf_printstring(st);
+		ESP_LOGI(TAG,"%s",st);
+	}
+	lcd_textbuf_printstring("\n");
 
 	if (vncc_si.fbheight != h)
 	{
-		sprintf(st,"Got h=%d need %d\n", vncc_si.fbheight, h);
+		sprintf(st,"Got h=%d need %d", vncc_si.fbheight, h);
 		lcd_textbuf_printstring(st);
 		ESP_LOGE(TAG,"%s",st);
 	}
+	else
+	{
+		sprintf(st,"Got h=%d  OK", vncc_si.fbheight);
+		lcd_textbuf_printstring(st);
+		ESP_LOGI(TAG,"%s",st);
+	}
+	lcd_textbuf_printstring("\n");
 
 	if (vncc_si.pf_depth != 16)
 	{
-		sprintf(st,"Got bpp=%d need 16\n", vncc_si.pf_depth);
+		sprintf(st,"Got bpp=%d need 16", vncc_si.pf_depth);
 		lcd_textbuf_printstring(st);
 		ESP_LOGE(TAG,"%s",st);
 	}
+	else
+	{
+		sprintf(st,"Got bpp=%d  OK", vncc_si.pf_depth);
+		lcd_textbuf_printstring(st);
+		ESP_LOGI(TAG,"%s",st);
+	}
+	lcd_textbuf_printstring("\n");
 }
 
 
@@ -513,7 +533,13 @@ static void vncc_client_task(void *pvParameters)
 	int len=0;
 	int err=0;
 	uint8_t msg_type=0;
+	char st[256];
+	uint8_t	 x=0;
+	int      ns=0;
+	int 	 i=0;
+	int	 gotone=FALSE;
 
+	bzero(&st,sizeof(st));
 	while (1)
 	{
 		if (vncc_state!=VNCC_MAINLOOP)
@@ -546,7 +572,7 @@ static void vncc_client_task(void *pvParameters)
 
 			case VNCC_EXPECTING_GREETING:
 				bzero(&vncc_rxbuf,sizeof(vncc_rxbuf));
-				len = recv(vncc_sock, vncc_rxbuf, sizeof(vncc_rxbuf) - 1, 0);	// -1, keep the last buffer byte a zero
+				len = readbytes(vncc_sock, vncc_rxbuf, 12);			// greeting always 12 bytes
 				if (len!=12)
 				{
 					ESP_LOGE(TAG,"expected 12 bytes, got %d",len);
@@ -558,12 +584,21 @@ static void vncc_client_task(void *pvParameters)
 					sprintf(vncc_txbuf,"RFB 003.008\n");
 					err = send(vncc_sock, (char*)&vncc_txbuf, 12, 0);	// Send my version
 					if (err<0)	
+					{
+						sprintf(st,"Server hungup when sending version");
+						ESP_LOGE(TAG,"%s",st);
+						lcd_textbuf_printstring(st);
+						lcd_textbuf_printstring("\n");
 						vncc_shutdown();
+					}
 					vncc_state = VNCC_EXPECTING_NUM_SECURITY_TYPES;
 				}
 				else	
 				{
-					ESP_LOGE(TAG, "VNC greet bad magic");
+					sprintf(st,"VNC greet has bad magic");
+					ESP_LOGE(TAG,"%s",st);
+					lcd_textbuf_printstring(st);
+					lcd_textbuf_printstring("\n");
 					vncc_shutdown();
 				}
 			break;
@@ -571,11 +606,26 @@ static void vncc_client_task(void *pvParameters)
 
 			//TODO: Some actual authentication
 			case VNCC_EXPECTING_NUM_SECURITY_TYPES:
-				bzero(&vncc_rxbuf,sizeof(vncc_rxbuf));
-				// Duno .. some bytes ...
-				len = recv(vncc_sock, (char*)&vncc_rxbuf, sizeof(vncc_rxbuf), 0);
-				printf("security types, got %d bytes\n",len);
-				dumphex((char*)&vncc_rxbuf, len);
+				len = readbytes(vncc_sock, (char*)&x, 1);			// read 1 unsigned 8 bit
+				ns=x;								// number of security types to follow
+				printf("Server sending list of %d security types\n",x);
+				gotone=FALSE;
+				for (i=0;i<ns;i++)
+				{
+					len = readbytes(vncc_sock, (char*)&x, 1);		// read values one at a time
+					printf("\tSever supports security type %d\n",x);
+					if (x==1)
+						gotone=TRUE;
+				}
+				if (gotone != TRUE)
+				{
+					sprintf(st,"VNC did not list SecurityType = 1 (NONE), This code needs a VNC server with no authentication");
+					ESP_LOGE(TAG,"%s",st);
+					lcd_textbuf_printstring(st);
+					lcd_textbuf_printstring("\n");
+					vncc_shutdown();
+					vTaskDelay(10000 / portTICK_PERIOD_MS);
+				}
 				vncc_txbuf[0]=1;						// Send my security type (1=NONE)
 				err = send(vncc_sock, (char*)&vncc_txbuf, 1, 0);		
 				vncc_state = VNCC_EXPECTING_SECURITY_RESULT;
@@ -584,7 +634,7 @@ static void vncc_client_task(void *pvParameters)
 
 
 			case VNCC_EXPECTING_SECURITY_RESULT:
-				len = recv(vncc_sock, (char*)&vncc_rxbuf, 4, 0);		// Expecting "SecurityResult" (4) 
+				len = readbytes(vncc_sock, (char*)&vncc_rxbuf, 4);		// Expecting "SecurityResult" (4) 
 				if (len==4)
 				{
 					printf("security result (should be 00 00 00 00) = ");
@@ -599,13 +649,13 @@ static void vncc_client_task(void *pvParameters)
 
 			case VNCC_EXPECTING_SERVER_INIT:
 				vTaskDelay(1000 / portTICK_PERIOD_MS);
-				len = recv(vncc_sock, (char*)&vncc_rxbuf, sizeof(struct vnc_ServerInit), 0);
+				len = readbytes(vncc_sock, (char*)&vncc_rxbuf, sizeof(struct vnc_ServerInit));
 				printf("read server init, got %d bytes, expecting %d\n",len,sizeof(struct vnc_ServerInit));
 				dumphex((char*)&vncc_rxbuf, len);
 				if (len==sizeof(struct vnc_ServerInit))
 					process_server_init((struct vnc_ServerInit*)&vncc_rxbuf);
 				else	vncc_shutdown();
-			//JA new, test
+
 				if (vncc_si.fbwidth != jag_get_display_width() || vncc_si.fbheight != jag_get_display_height() || vncc_si.pf_depth != 16)
 				{
 					display_mismatch();
@@ -615,7 +665,7 @@ static void vncc_client_task(void *pvParameters)
 				else
 				{
 					vncc_send_setencodings(); 
-					lcd_textbuf_enable(FALSE, FALSE);			// Make sure task stops driving SPI LCD
+					lcd_textbuf_enable(FALSE, FALSE);				// Make sure task stops driving SPI LCD
 					vncc_send_framebuffer_update_request(0, 0, 240, 320, 0);	// ASk for entire screen now
 					vncc_state = VNCC_MAINLOOP;
 				}

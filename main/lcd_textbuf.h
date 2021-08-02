@@ -23,11 +23,16 @@
 
 
 // Prototypes
+//void lcd_textbuf_init(const font_t* font);
+void lcd_textbuf_init(const font_t* font, int ox, int oy, int forcelines, int forcecols);
 void lcd_textbuf_clear(int t, int p);
 void lcd_textbuf_setcolors(uint16_t fgcolor, uint16_t bgcolor);
-void lcd_textbuf_init(scr_driver_t* driver, const font_t* font, int lines, int cols);
 void lcd_textbuf_enable(int e, int cleardisplay);
 void lcd_textbuf_printstring(char *st);
 void lcd_textbuf_set_cursor_position(int l, int c);
+int lcd_textbuf_getlines();
+int lcd_textbuf_getcols();
+
+
 
 

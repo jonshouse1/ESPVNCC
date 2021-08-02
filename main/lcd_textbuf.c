@@ -72,7 +72,7 @@ extern const char *TAG;
 
 
 // Display terminal text
-static		scr_driver_t		lcd_drv;
+//static		scr_driver_t		lcd_drv;
 char 		textbuf[TEXTBUF_MAXLINES][TEXTBUF_MAXLINELEN];
 char		ptextbuf[TEXTBUF_MAXLINES][TEXTBUF_MAXLINELEN];
 int		curposl		= 0;
@@ -81,6 +81,13 @@ static int	textbuf_enable	= FALSE;						// TRUE draws pixels to the LCD
 static int	textbuf_redraw	= TRUE;							// TRUE redraws every character
 uint16_t	textbuf_fgcolor = COLOR_GREEN;
 uint16_t	textbuf_bgcolor = COLOR_BLACK; 
+uint16_t	textbuf_wspace	= 2;							// space between each character (accross)
+uint16_t	textbuf_hspace  = 2;							// space between each line of text
+uint16_t	textbuf_fbwidth = 0;
+uint16_t	textbuf_fbheight= 0;
+uint16_t	textbuf_ox	= 0;							// pixel offset of top left
+uint16_t	textbuf_oy	= 0;
+
 
 // Text
 const font_t		*textbuf_font = NULL;
@@ -155,13 +162,13 @@ void lcd_textbuf_display()
 			{
 				if (textbuf[l][c]>=' ' && textbuf_enable==TRUE)		// Valud ASCII for our font ?
 				{
-					jag_draw_char((textbuf_font->Width+2)*c, (textbuf_font->Height+2)*l, 
+					jag_draw_char(textbuf_ox+(textbuf_font->Width+textbuf_wspace)*c, textbuf_oy+(textbuf_font->Height+textbuf_hspace)*l, 
 							textbuf[l][c], textbuf_font, textbuf_bgcolor, textbuf_fgcolor);
 				}
 				// redraw on then write an ASCII space
 				if (textbuf[l][c]<' ' && textbuf_redraw==TRUE && textbuf_enable==TRUE)
 				{
-					jag_draw_char((textbuf_font->Width+2)*c, (textbuf_font->Height+2)*l, 
+					jag_draw_char(textbuf_ox+(textbuf_font->Width+textbuf_wspace)*c, textbuf_oy+(textbuf_font->Height+textbuf_hspace)*l, 
 							' ', textbuf_font, textbuf_bgcolor, textbuf_fgcolor);
 				}
 			}
@@ -288,27 +295,48 @@ void lcd_textbuf_setcolors(uint16_t fgcolor, uint16_t bgcolor)
 }
 
 
+// Return the number of text lines on the display
+int lcd_textbuf_getlines()
+{
+	return(textbuf_lines);								// how many lines of text on the display
+}
 
-// Caller tells us how many lines of text and how many characters per line
-void lcd_textbuf_init(scr_driver_t* driver, const font_t* font, int lines, int cols)
+// Return the number of characters per line on the display
+int lcd_textbuf_getcols()
+{
+	return(textbuf_cols);								// how many characters per line of text
+}
+
+
+
+
+// Can be called multiple times, must be called after screen rotation
+// ox,oy is offset of top left of text console,  forcelines,forcecols ovverride defaults.
+void lcd_textbuf_init(const font_t* font, int ox, int oy, int forcelines, int forcecols)
 {
 	curposl		= 0;
 	curposc		= 0;
-	lcd_drv 	= *driver;
+	textbuf_fbwidth = jag_get_display_width();
+	textbuf_fbheight= jag_get_display_height();
 	textbuf_font	= font;
-	textbuf_lines	= lines;							// lcd_textbuf_init() populates these
-	textbuf_cols	= cols;
+	textbuf_cols	= textbuf_fbwidth  / (textbuf_font->Width  + textbuf_wspace);	// How many chars fit accross a line
+	textbuf_lines	= textbuf_fbheight / (textbuf_font->Height + textbuf_hspace);	// How many chars top top bottom 
 	textbuf_redraw	= TRUE;	
 
-	//scr_info_t lcd_info;
-	//lcd_drv.get_info(&lcd_info);
-	//ESP_LOGI(TAG,"Screen name:%s | width:%d | height:%d", lcd_info.name, lcd_info.width, lcd_info.height);
+	if (forcelines >0)
+		textbuf_lines = forcelines;
+	if (forcecols >0)
+		textbuf_cols = forcecols;	
+	if (ox>0)
+		textbuf_ox = ox;
+	if (oy>0)
+		textbuf_oy = oy;
+
+	ESP_LOGI(TAG,"lcd_textbuf_init() LCD Framebuffer %d x %d",textbuf_fbwidth, textbuf_fbheight);
+	ESP_LOGI(TAG,"lcd_textbuf_init() %d lines of %d chars, each %dx%d pixels",textbuf_lines, textbuf_cols, textbuf_font->Width, textbuf_font->Height);
 
 	if (ctask != pdPASS)								// not already created ?
 		ctask = xTaskCreate(textbuf_task, "textbuf_cursor_task", 16*1024, NULL, 3, &xhandle);  
-
-	ESP_LOGI(TAG,"lcd_textbuf_init() - LCD text terminal %d lines x %d cols, each %dx%d",
-		lines, cols, textbuf_font->Width, textbuf_font->Height);
 }
 
 

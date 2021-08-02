@@ -50,6 +50,7 @@
 #define VNC_ET_ZRLE				16
 
 
+
 struct __attribute__ ((__packed__)) vnc_servercuttext
 {
 	uint8_t		padding[3];

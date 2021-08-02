@@ -21,6 +21,10 @@ int udp_generic_send(char *d, int len, char *destination_ip, int destination_por
 void DumpHex(const void* data, size_t size);
 //void jcp_send_device_state(int idx, uint16_t value1, uint16_t value2, int asciiorbinary, char* valuebytes, int valuebyteslen);
 void lcd_gui_datetimestring(int tlen, char *tdata);
+void doconnect();
+void aethernet_init();
+void awifi_init();
+
 
 
 //void lcd_textbuf_clear();
