@@ -572,7 +572,7 @@ static void vncc_client_task(void *pvParameters)
 
 			case VNCC_EXPECTING_GREETING:
 				bzero(&vncc_rxbuf,sizeof(vncc_rxbuf));
-				len = readbytes(vncc_sock, vncc_rxbuf, 12);			// greeting always 12 bytes
+				len = readbytes(vncc_sock, (char*)&vncc_rxbuf, 12);		// greeting always 12 bytes
 				if (len!=12)
 				{
 					ESP_LOGE(TAG,"expected 12 bytes, got %d",len);
