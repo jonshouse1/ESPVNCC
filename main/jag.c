@@ -86,8 +86,6 @@ void jag_draw_bitmap(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *b
 
 
 
-
-
 // online line at a time, stack buffer, probably thread safe
 void jag_draw_icon_s2(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char *image)
 {
