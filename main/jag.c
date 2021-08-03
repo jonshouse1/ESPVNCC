@@ -82,7 +82,6 @@ void jag_draw_bitmap(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *b
 	//else ESP_LOGE(TAG,"jag_draw_bitmap() Failed to aquire semaphore");
 }
 
-//                                        jag_draw_bitmap(rec.xpos, rec.ypos+l, rec.width, 1, (uint16_t*)&pixels);
 
 
 
