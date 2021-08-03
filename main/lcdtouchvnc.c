@@ -77,7 +77,7 @@ void app_main(void)
 	// Change LCD rotation
 	// possible rotations   portrait:   SCR_DIR_LRTB,  SCR_DIR_LRBT,  SCR_DIR_RLTB,  SCR_DIR_RLBT
 	//                      landscape:  SCR_DIR_TBLR,  SCR_DIR_BTLR,  SCR_DIR_TBRL,  SCR_DIR_BTRL
-	//lcd_ts_rotate(SCR_DIR_TBLR);								// uncomment for default potrait LRBT
+	//lcd_ts_rotate(SCR_DIR_TBLR);								// comment out for default potrait LRBT
 
 	jag_init((scr_driver_t*)&lcd_drv);							// initialise my graphics library
 	lcd_textbuf_init(&Font12, -1, -1, -1, -1);						// initialise the text terminal
