@@ -28,7 +28,7 @@
 #include "touch_panel.h"
 
 
-void lcd_rotate();
+void lcd_ts_rotate(scr_dir_t r);
 void led_pwm_set(int b);
 void lcd_init(int w, int h);
 

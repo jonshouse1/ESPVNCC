@@ -17,8 +17,9 @@
 */
 
 //#define USE_WIFI			// Uncomment this line for Wifi rather than Ethernet
-#define WIFI_SSID		"YOUR SSID"
-#define WIFI_PASS		"YOUR PASSWORD"
+//#define WIFI_SSID		"YOUR SSID HERE"
+//#define WIFI_PASS		"YOUR PASSWORD HERE"
+
 #define VNC_SERVER_IPADDR 	"192.168.1.111"
 #define VNC_SERVER_SCREEN_NUM	1
 
@@ -72,11 +73,17 @@ void app_main(void)
 {
 	bzero(&lcd_drv, sizeof(scr_driver_t));
 	lcd_init(240, 320);									// initialise the SPI LCD driver
+
+	// Change LCD rotation
+	// possible rotations   portrait:   SCR_DIR_LRTB,  SCR_DIR_LRBT,  SCR_DIR_RLTB,  SCR_DIR_RLBT
+	//                      landscape:  SCR_DIR_TBLR,  SCR_DIR_BTLR,  SCR_DIR_TBRL,  SCR_DIR_BTRL
+	//lcd_ts_rotate(SCR_DIR_TBLR);								// uncomment for default potrait LRBT
+
 	jag_init((scr_driver_t*)&lcd_drv);							// initialise my graphics library
 	lcd_textbuf_init(&Font12, -1, -1, -1, -1);						// initialise the text terminal
 	lcd_textbuf_setcolors(COLOR_WHITE, COLOR_BLUE);
 	lcd_textbuf_enable(TRUE, TRUE);								// text terminal active and clear display
-	lcd_textbuf_printstring("POE LCD VNC V0.12 ...\n\n");
+	lcd_textbuf_printstring("POE LCD VNC V0.13 ...\n\n");
 
 #ifdef USE_WIFI
 	awifi_init(WIFI_SSID, WIFI_PASS);

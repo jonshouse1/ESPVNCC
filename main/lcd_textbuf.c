@@ -19,6 +19,7 @@
 /* 
 	lcd_textbuf.c
 	Text framebuffer for ESP IDF
+	Pixel rendering relies on jag.c
 
 	See /esp/esp-iot-solution/components/display/touch_panel/calibration/
 	basic_painter/fonts/
@@ -41,7 +42,6 @@
 			Clear display, start cursor going
 */
 
-
 #include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -60,7 +60,6 @@
 #include "esp_system.h"
 #include "lwip/sockets.h"
 
-
 #include "global.h"
 #include "lcd_textbuf.h"
 #include "jag.h"
@@ -70,9 +69,6 @@
 #define MAXCHARPIXELBUF		18*25*sizeof(uint16_t)
 extern const char *TAG;
 
-
-// Display terminal text
-//static		scr_driver_t		lcd_drv;
 char 		textbuf[TEXTBUF_MAXLINES][TEXTBUF_MAXLINELEN];
 char		ptextbuf[TEXTBUF_MAXLINES][TEXTBUF_MAXLINELEN];
 int		curposl		= 0;
@@ -298,13 +294,13 @@ void lcd_textbuf_setcolors(uint16_t fgcolor, uint16_t bgcolor)
 // Return the number of text lines on the display
 int lcd_textbuf_getlines()
 {
-	return(textbuf_lines);								// how many lines of text on the display
+	return(textbuf_lines);
 }
 
 // Return the number of characters per line on the display
 int lcd_textbuf_getcols()
 {
-	return(textbuf_cols);								// how many characters per line of text
+	return(textbuf_cols);
 }
 
 

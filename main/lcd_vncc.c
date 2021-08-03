@@ -666,7 +666,9 @@ static void vncc_client_task(void *pvParameters)
 				{
 					vncc_send_setencodings(); 
 					lcd_textbuf_enable(FALSE, FALSE);				// Make sure task stops driving SPI LCD
-					vncc_send_framebuffer_update_request(0, 0, 240, 320, 0);	// ASk for entire screen now
+					//vncc_send_framebuffer_update_request(0, 0, 240, 320, 0);	// ASk for entire screen now
+					vncc_send_framebuffer_update_request(0, 0, jag_get_display_width(), 
+									     jag_get_display_height(), 0);	// ASk for entire screen now
 					vncc_state = VNCC_MAINLOOP;
 				}
 			break;
@@ -722,7 +724,9 @@ static void vncc_periodic_request_and_touch_task(void *pvParameters)
 		if (vncc_state==VNCC_MAINLOOP && vncc_sock >0)
 		{
 			if (vncc_busy!=TRUE)							// Connected and otherwise idle
-				vncc_send_framebuffer_update_request(0, 0, 240, 320, 1);	// Ask for rectangles (incremental)
+				//vncc_send_framebuffer_update_request(0, 0, 240, 320, 1);	// Ask for rectangles (incremental)
+				vncc_send_framebuffer_update_request(0, 0, jag_get_display_width(),
+								     jag_get_display_height(), 1);	// Ask for rectangles (incremental)
 
 			touch_drv.read_point_data(&points);
 			x=points.curx[0];

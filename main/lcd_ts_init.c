@@ -57,6 +57,7 @@
 
 
 extern const char *TAG;
+extern scr_dir_t			rotation;
 extern scr_driver_t			lcd_drv;
 extern touch_panel_driver_t		touch_drv;
 
@@ -96,11 +97,25 @@ void led_pwm_set(int b)
 }
 
 
-// Change LCD rotation
+// Change LCD and touch panel rotation
 // possible rotations	portrait:   SCR_DIR_LRTB,  SCR_DIR_LRBT,  SCR_DIR_RLTB,  SCR_DIR_RLBT
 // 			landscape:  SCR_DIR_TBLR,  SCR_DIR_BTLR,  SCR_DIR_TBRL,  SCR_DIR_BTRL
-void lcd_rotate()
+// 'r' is screen direction, the touch panel will be set to match
+void lcd_ts_rotate(scr_dir_t r)
 {
+	switch (r)
+	{
+		case SCR_DIR_LRTB:	touch_drv.set_direction(TOUCH_DIR_LRTB);	break;
+		case SCR_DIR_LRBT:	touch_drv.set_direction(TOUCH_DIR_LRBT);	break;
+		case SCR_DIR_RLTB:	touch_drv.set_direction(TOUCH_DIR_RLTB);	break;
+		case SCR_DIR_RLBT:	touch_drv.set_direction(TOUCH_DIR_RLBT);	break;
+		case SCR_DIR_TBLR:	touch_drv.set_direction(TOUCH_DIR_TBLR);	break;
+		case SCR_DIR_BTLR:	touch_drv.set_direction(TOUCH_DIR_BTLR);	break;
+		case SCR_DIR_TBRL:	touch_drv.set_direction(TOUCH_DIR_TBRL);	break;
+		case SCR_DIR_BTRL:	touch_drv.set_direction(TOUCH_DIR_BTRL);	break;
+		default:	break;
+	}
+	lcd_drv.set_direction(r);
 }
 
 
