@@ -54,8 +54,6 @@ char 			vncc_host_ip[22];
 
 extern const char 	*TAG;
 extern int 		online;
-//extern int  		link_up;
-//extern int 		connection_state;
 extern int 		backlight;
 
 static int		vncc_sock		= -1;
@@ -313,10 +311,10 @@ static void vncc_drain(char *s)
 
 
 
+static uint16_t		pixels[2048];
 void vncc_process_rectangle(int r)
 {
 	struct		vnc_rect	rec;
-	uint16_t	pixels[1024];
         uint32_t	sclock;										// start time
         uint32_t	eclock;										// end time
 	uint32_t	tms;										// time in millliseconds
@@ -324,6 +322,7 @@ void vncc_process_rectangle(int r)
 	int		l   = 0;
 	int		dw  = 0;									// display width
 	int		dh  = 0; 									// display height
+	static int po = 0;										// Pixels offset, either 0 or 1024
 
         sclock = (uint32_t)clock();									// Default clock is 10ms resolution
 	vncc_busy = TRUE;
@@ -358,9 +357,11 @@ void vncc_process_rectangle(int r)
 			case VNC_ET_RAW:								// 0x0000
 				for (l=0;l<rec.height;l++)						// for each line of the rectangle
 				{
-					readbytes(vncc_sock, (char*)&pixels, rec.width*2);		// read one lines worth of pixel data
-					//jag_draw_icon(rec.xpos, rec.ypos+l, rec.width, 1, (char*)&pixels);
-					jag_draw_bitmap(rec.xpos, rec.ypos+l, rec.width, 1, (uint16_t*)&pixels);
+					if (po==0)
+						po=1024;
+					else	po=0;							// Toggle between 0 and 1024
+					readbytes(vncc_sock, (char*)&pixels[po], rec.width*2);		// read one lines worth of pixel data
+					jag_draw_bitmap(rec.xpos, rec.ypos+l, rec.width, 1, (uint16_t*)&pixels[po]);
 				}
 			break;
 
@@ -404,7 +405,6 @@ static void vncc_process_framebufferupdate()
 	int    r=0;
 	int    len=0;
 
-	//vncc_busy = TRUE;
 	len = readbytes(vncc_sock, (char*)&fbu, sizeof(struct vnc_FramebufferUpdate));
 	if (len==sizeof(struct vnc_FramebufferUpdate))
 	{
@@ -422,7 +422,6 @@ static void vncc_process_framebufferupdate()
 			vncc_process_rectangle(r);						// read and process each one
 	}
 	else	ESP_LOGE(TAG,"vncc_process_framebufferupdate() expected %d read, got %d",sizeof(struct vnc_FramebufferUpdate),len);
-	//vncc_busy = FALSE;
 }
 
 

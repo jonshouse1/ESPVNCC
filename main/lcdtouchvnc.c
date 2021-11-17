@@ -50,15 +50,12 @@
 #include "lcd_vncc.h"
 
 
-// globals
 scr_driver_t				lcd_drv; 
 touch_panel_driver_t 			touch_drv;
 const char 				*TAG = "lcdtouchvnc";
 char					client_ip[16];
 char					server_ip[16];
 int					online = FALSE;					// TRUE = connected with an IP address?
-//int					link_up	= FALSE;				// TRUE = network cable plugged in
-//int					connection_state= 0;				// non zero when client_ip, server_ip or online change state
 
 
 

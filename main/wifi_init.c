@@ -41,7 +41,6 @@ extern const char *TAG;
 
 extern  char	client_ip[16];
 extern  int	online;
-//extern  int	link_up;
 
 static EventGroupHandle_t s_wifi_event_group;
 

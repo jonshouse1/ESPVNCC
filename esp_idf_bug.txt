@@ -1,0 +1,27 @@
+Some versions of the ESP IDF seem to have a driver bug when using
+physical Eternet.  When Ethernet is active at same time as DMA SPI
+then the SPI output is sometimes corrupted.
+
+
+idf.py --version
+ESP-IDF v4.4-dev-1594-g1d7068e4b-dirty
+
+
+Bug in Etheret driver, causes display corruption when ethernet
+and SPI display are both active.
+
+To fix, change:
+/esp-idf/components/hal/esp32/emac_hal.c
+
+	dmabmr.rx_dma_pbl = EMAC_DMA_BURST_LENGTH_32BEAT;
+TO
+    	dmabmr.rx_dma_pbl = EMAC_DMA_BURST_LENGTH_8BEAT;
+
+
+See:
+https://github.com/espressif/esp-idf/issues/7380#issuecomment-968868025
+
+
+
+
+

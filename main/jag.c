@@ -35,13 +35,13 @@
 #include "painter_fonts.h"
 
 #define JAG_MAXPIXELS_PERLINE	1200						// the maximum number of pixels for one displayed line
-#define DRIVER_BUG								// set this to add delays before display writes
 
 extern const char *TAG;
 static scr_driver_t		jag_lcd_drv;
-static uint16_t			jag_width	= 0;	// was lines
-static uint16_t			jag_height	= 0;	// was cols
-//SemaphoreHandle_t 		xs		= NULL;
+static uint16_t			jag_width	= 0;
+static uint16_t			jag_height	= 0;
+static uint16_t			pbuf[JAG_MAXPIXELS_PERLINE];
+SemaphoreHandle_t 		xs		= NULL;
 
 
 
@@ -54,75 +54,48 @@ void jag_init(scr_driver_t* driver)
 	jag_width	= lcd_info.width;
 	jag_height	= lcd_info.height;
 	jag_lcd_drv.get_info(&lcd_info);
-	//if (xs == NULL)
-		//xs = xSemaphoreCreateMutex();
+	if (xs == NULL)
+		xs = xSemaphoreCreateMutex();
 	ESP_LOGI(TAG,"jag_init() - Screen name:%s | width:%d | height:%d", lcd_info.name, lcd_info.width, lcd_info.height);
 }
 
 
 
 
-// Everything comes through here! good place to serialise everything with a lock
+// Everything comes through here, possibly re-enterently
 void jag_draw_bitmap(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *bitmap)
 {
 	esp_err_t	ret;
 
-#ifdef DRIVER_BUG
-	ets_delay_us(375);								// hardware or driver issue ?
-#endif
-	//if (xSemaphoreTake( xs, ( TickType_t ) 1000/portTICK_PERIOD_MS ) == pdTRUE )
-	//{
+	if (xSemaphoreTake( xs, ( TickType_t ) 1000/portTICK_PERIOD_MS ) == pdTRUE )	// iot display code should not need this?
+	{
 		ret=jag_lcd_drv.draw_bitmap(x, y, w, h, (uint16_t*)bitmap);		// Call ili9341 driver, limited to 4000ish bytes
 		if (ret!=ESP_OK)							// set_window failed and no data was written
 		{
 			ESP_LOGE(TAG,"draw_bitmap returned %d",ret);
 		}
-		//xSemaphoreGive(xs);
-	//}
-	//else ESP_LOGE(TAG,"jag_draw_bitmap() Failed to aquire semaphore");
+		xSemaphoreGive(xs);
+	}
+	else ESP_LOGE(TAG,"jag_draw_bitmap() Failed to aquire semaphore");
 }
 
 
 
 
-// online line at a time, stack buffer, probably thread safe
-void jag_draw_icon_s2(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char *image)
+// draw an image of any size one line at a time. Optionally copy image data first as draw_bitmap needs image in RAM not flash
+void jag_draw_icon(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char *image)
 {
-	uint16_t	buf[JAG_MAXPIXELS_PERLINE];				// stack allocated buffer, thread safe 
 	uint16_t	l   = 0;
 	uint16_t	bytesperline=0;
 
 	bytesperline = w*sizeof(uint16_t);
-	for (l=0;l<h;l++)							// for every line of image
+	for (l=0;l<h;l++)								// for every line of image
 	{
-		memcpy(&buf, image+(bytesperline*l), bytesperline);		// copy one line of pixels from flash to RAM
-		jag_draw_bitmap(x, y+l, w, 1, (uint16_t*)&buf);			// draw line of pixels
+		memcpy(&pbuf, image+(bytesperline*l), bytesperline);			// copy one line of pixels from flash to RAM
+		jag_draw_bitmap(x, y+l, w, 1, (uint16_t*)&pbuf);			// draw line of pixels
 	}
 }
 
-// Entire image at once, draw icon using malloc, thread safe but uses an image worth of RAM
-void jag_draw_icon_ma(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char *image)
-{
-	uint16_t*	buf = malloc(w*h*sizeof(uint16_t));			// malloc enough ram for entire image
-	uint16_t	l   = 0;
-
-	memcpy(buf, image, w*h*sizeof(uint16_t));				// entire image
-	for (l=0;l<h;l++)							// for every line of image
-		jag_draw_bitmap(x, y+l, w, 1, (uint16_t*)buf+(w*l));		// draw line of pixels
-	free(buf);
-}
-
-
-// The basic draw_bitmap function only supports upto 4000 ish bytes written in one go.
-// draw images one scan line at a time so we can work with any size of image
-// across, down, width, height, pointer to rgb565 pixels
-void jag_draw_icon(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char *image)
-{
-	//printf("jag_draw_icon() %d %d %d %d %p\n",x,y,w,h,image);
-	jag_draw_icon_s2(x, y, w, h, image);
-	//jag_draw_icon_ma(x, y, w, h, image);
-	//printf("GL:%u\tRL:%u\tWL:%u\n",lck_gl,lck_rl,lck_wl); 
-}
 
 
 
@@ -131,7 +104,7 @@ void jag_draw_icon(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char *i
 void jag_fill_lines(uint16_t startline, uint16_t numlines, uint16_t color)
 {
 	uint16_t	buf[JAG_MAXPIXELS_PERLINE];
-	uint16_t l=0;
+	uint16_t 	l=0;
 
 	for (l=0;l<jag_width;l++)
 		buf[l]=color;
@@ -139,12 +112,6 @@ void jag_fill_lines(uint16_t startline, uint16_t numlines, uint16_t color)
 		jag_draw_bitmap(0, l, jag_width, 1, (uint16_t*)&buf);	
 }
 
-
-
-// Fill a rectange in a color
-void jag_fill_area(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
-{
-}
 
 
 
@@ -161,13 +128,13 @@ void jag_cls(uint16_t color)
 // This routine is hammered and may be re-interant
 void jag_draw_char(uint16_t x, uint16_t y, char ascii_char, const font_t *font, uint16_t bgcolor, uint16_t fgcolor)
 {
-	uint16_t buf[MAXCHARBUF];
-	int i, j;
-	uint16_t char_size = font->Height * (font->Width / 8 + (font->Width % 8 ? 1 : 0));
-	unsigned int char_offset = (ascii_char - ' ') * char_size;
+	int 		ox=0;
+	int 		oy=0;
+	uint16_t 	buf[MAXCHARBUF];
+	int 		i, j;
+	uint16_t 	char_size = font->Height * (font->Width / 8 + (font->Width % 8 ? 1 : 0));
+	unsigned int	char_offset = (ascii_char - ' ') * char_size;
 	const unsigned char *ptr = &font->table[char_offset];
-	int ox=0;
-	int oy=0;
 
 	if (font==NULL)
 		return;
@@ -211,9 +178,8 @@ void jag_draw_string(uint16_t x, uint16_t y, char* text, const font_t *font, uin
 void jag_draw_string_centered(uint16_t x, uint16_t y, char* text, const font_t *font, uint16_t bgcolor, uint16_t fgcolor)
 {
 	uint16_t i=0;
-	uint16_t lp=0;						// left point
+	uint16_t lp=0;											// left point
 
-	//lp=x-(font->Width * (strlen(text)/2));
 	lp=x-((strlen(text)*font->Width)/2);
 	for (i=0;i<strlen(text);i++)
 		jag_draw_char(lp+(font->Width * i), y, text[i], font, bgcolor, fgcolor);

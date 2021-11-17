@@ -45,11 +45,8 @@
 
 
 extern const char *TAG;
-
-// globals
 extern  char	client_ip[16];
 extern  int	online;
-//extern  int	link_up;
 
 
 /** Event handler for Ethernet events */
@@ -63,7 +60,6 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base, int32_t ev
 	{
 		case ETHERNET_EVENT_CONNECTED:
 			esp_eth_ioctl(eth_handle, ETH_CMD_G_MAC_ADDR, mac_addr);
-			//link_up=TRUE;
 			ESP_LOGI(TAG, "Ethernet Link Up");
 			ESP_LOGI(TAG, "Ethernet HW Addr %02x:%02x:%02x:%02x:%02x:%02x",
 				mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
@@ -71,7 +67,6 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base, int32_t ev
 		break;
 
 		case ETHERNET_EVENT_DISCONNECTED:
-			//link_up=FALSE;
 			ESP_LOGI(TAG, "Ethernet Link Down");
 			lcd_textbuf_printstring("Ethernet Link Down\n");
 		break;
