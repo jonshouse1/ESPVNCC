@@ -26,7 +26,7 @@ Then VNC connect to it with this code.
 
 At the moment only "raw" encoding is supported for 16 bit RGB (565) format.
 
-Some IDF versions seem to have driver issues when using Ethernet, see
+Some IDF versions seem to have driver issues when using Ethernet, see "esp_idf_bug.txt"
 
 ![Screenshot](vncc_screenshot.jpg)
 
