@@ -20,7 +20,7 @@
 //#define WIFI_SSID		"YOUR SSID HERE"
 //#define WIFI_PASS		"YOUR PASSWORD HERE"
 
-#define VNC_SERVER_IPADDR 	"192.168.1.111"
+#define VNC_SERVER_IPADDR 	"10.10.10.6"
 #define VNC_SERVER_SCREEN_NUM	1
 
 
@@ -80,7 +80,7 @@ void app_main(void)
 	lcd_textbuf_init(&Font12, -1, -1, -1, -1);						// initialise the text terminal
 	lcd_textbuf_setcolors(COLOR_WHITE, COLOR_BLUE);
 	lcd_textbuf_enable(TRUE, TRUE);								// text terminal active and clear display
-	lcd_textbuf_printstring("POE LCD VNC V0.13 ...\n\n");
+	lcd_textbuf_printstring("POE LCD VNC V0.14 ...\n\n");
 
 #ifdef USE_WIFI
 	awifi_init(WIFI_SSID, WIFI_PASS);
