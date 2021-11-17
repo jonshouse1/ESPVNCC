@@ -26,8 +26,7 @@ Then VNC connect to it with this code.
 
 At the moment only "raw" encoding is supported for 16 bit RGB (565) format.
 
-This project is not reliable, a delay is required ets_delay_us() before the 
-SPI display write, otherwise the screen corrupts.
+Some IDF versions seem to have driver issues when using Ethernet, see
 
 ![Screenshot](vncc_screenshot.jpg)
 
